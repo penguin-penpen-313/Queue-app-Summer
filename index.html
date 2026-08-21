@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>順番待ち</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 46px 18px 40px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ===== ヘッダー ===== */
+  .head { text-align: center; margin-bottom: 22px; }
+
+  .head .kicker { margin-bottom: 10px; display: block; }
+
+  .head h1 {
+    font-family: var(--font-disp);
+    font-size: clamp(24px, 6.4vw, 40px);
+    line-height: 1.25;
+    letter-spacing: 0.02em;
+    background: linear-gradient(100deg, var(--gold) 0%, #fff3c4 35%, var(--lantern) 70%, var(--hanabi-a) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 14px rgba(255,210,74,0.28));
+  }
+
+  .head .sub {
+    margin-top: 8px;
+    font-size: clamp(12px, 3vw, 15px);
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .meta {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--gold);
+    background: rgba(255,210,74,0.10);
+    border: 1px solid rgba(255,210,74,0.28);
+    padding: 4px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.live { color: var(--hanabi-b); background: rgba(92,225,230,0.08); border-color: rgba(92,225,230,0.3); }
+
+  .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--hanabi-b);
+    box-shadow: 0 0 10px var(--hanabi-b);
+    margin-right: 6px;
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  /* ===== セクション見出し ===== */
+  .sec-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 26px 4px 12px;
+  }
+  .sec-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+  .sec-label b { color: var(--gold); font-weight: 700; letter-spacing: 0.1em; }
+
+  /* ===== NOW カード ===== */
+  #nowSection { display: none; }
+  #nowSection.on { display: block; }
+
+  .now-grid { display: grid; gap: 12px; }
+  .now-grid.multi { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+
+  .now-card {
+    position: relative;
+    border-radius: 20px;
+    padding: 26px 24px;
+    background:
+      radial-gradient(circle at 88% 0%, rgba(255,77,61,0.28) 0%, transparent 62%),
+      linear-gradient(135deg, rgba(255,210,74,0.16), rgba(255,77,61,0.10));
+    border: 1.5px solid rgba(255,210,74,0.5);
+    box-shadow: 0 0 48px rgba(255,140,60,0.22), inset 0 0 40px rgba(255,210,74,0.06);
+    overflow: hidden;
+    animation: popIn .5s cubic-bezier(.2,1.3,.5,1);
+  }
+  .now-card::after {
+    content: '';
+    position: absolute;
+    inset: -50% -20% auto auto;
+    width: 260px; height: 260px;
+    background: radial-gradient(circle, rgba(255,210,74,0.20) 0%, transparent 70%);
+    pointer-events: none;
+    animation: glow 3.4s ease-in-out infinite;
+  }
+  @keyframes glow { 0%,100%{opacity:.6} 50%{opacity:1} }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(.94) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .now-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: #2a0d05;
+    background: linear-gradient(100deg, var(--gold), #ffb64a);
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  .now-tag i { font-style: normal; letter-spacing: 0.05em; font-family: var(--font-jp); }
+
+  .now-name {
+    font-family: var(--font-disp);
+    font-size: clamp(30px, 8.4vw, 58px);
+    line-height: 1.15;
+    color: #fff;
+    text-shadow: 0 0 26px rgba(255,210,74,0.55), 0 0 60px rgba(255,77,61,0.3);
+    word-break: break-word;
+  }
+  .now-name .hon {
+    font-family: var(--font-jp);
+    font-size: 0.36em;
+    font-weight: 500;
+    color: rgba(255,246,229,0.66);
+    margin-left: 6px;
+  }
+
+  /* NOW が複数のときは1枚あたりが狭くなるので文字を小さく */
+  .now-grid.multi .now-card { min-width: 0; padding: 20px 18px; }
+  .now-grid.multi .now-name { font-size: clamp(24px, 4.6vw, 38px); }
+  .now-grid.multi .now-tag  { font-size: 10px; margin-bottom: 9px; }
+
+  /* ===== NEXT カード ===== */
+  .next-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-radius: 20px;
+    padding: 26px 24px;
+    background: linear-gradient(160deg, rgba(21,26,61,0.94), rgba(15,18,45,0.94));
+    border: 1.5px solid rgba(177,140,255,0.4);
+    box-shadow: 0 0 34px rgba(120,90,220,0.16);
+    overflow: hidden;
+    animation: popIn .45s ease;
+  }
+  .next-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--hanabi-c), var(--hanabi-b));
+  }
+
+  .next-num {
+    flex-shrink: 0;
+    width: 66px;
+    text-align: center;
+  }
+  .next-num .n {
+    font-family: var(--font-disp);
+    font-size: clamp(38px, 9vw, 54px);
+    line-height: 1;
+    color: var(--hanabi-b);
+    text-shadow: 0 0 24px rgba(92,225,230,0.6);
+  }
+  .next-num .l {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .next-body { flex: 1; min-width: 0; }
+  .next-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    color: var(--hanabi-b);
+    margin-bottom: 6px;
+  }
+  .next-tag i { font-style: normal; color: var(--muted); font-family: var(--font-jp); letter-spacing: .05em; margin-left: 6px; }
+  .next-name {
+    font-family: var(--font-disp);
+    font-size: clamp(24px, 6.6vw, 42px);
+    line-height: 1.2;
+    color: #fff;
+    word-break: break-word;
+  }
+  .next-name .hon {
+    font-family: var(--font-jp);
+    font-size: 0.38em;
+    font-weight: 500;
+    color: rgba(255,246,229,0.6);
+    margin-left: 5px;
+  }
+
+  /* NOW がいるときは NEXT を一段控えめに */
+  body.has-now .next-card { padding: 18px 20px; gap: 16px; }
+  body.has-now .next-num { width: 50px; }
+  body.has-now .next-num .n { font-size: clamp(26px, 6vw, 34px); }
+  body.has-now .next-name { font-size: clamp(19px, 4.6vw, 28px); }
+
+  /* ===== このあとのリスト ===== */
+  .up-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 16px;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    background: rgba(255,255,255,0.028);
+    border: 1px solid rgba(255,255,255,0.05);
+    animation: fadeUp .35s ease;
+  }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  .up-num {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+    width: 30px;
+    text-align: center;
+    color: var(--gold);
+    opacity: .8;
+    flex-shrink: 0;
+  }
+  .up-name {
+    font-size: 17px;
+    font-weight: 700;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(255,246,229,0.9);
+  }
+  .up-item:nth-child(2) { opacity: .82; }
+  .up-item:nth-child(3) { opacity: .64; }
+  .more-note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 0 0;
+  }
+
+  /* ===== 空状態 ===== */
+  .empty {
+    text-align: center;
+    padding: 54px 20px;
+  }
+  .empty .big {
+    font-family: var(--font-disp);
+    font-size: clamp(26px, 7vw, 42px);
+    color: rgba(255,210,74,0.28);
+    letter-spacing: 0.08em;
+  }
+  .empty .sub { margin-top: 10px; font-size: 14px; color: var(--muted); }
+
+  /* ===== 並び方の案内 ===== */
+  .howto {
+    margin-top: auto;
+    padding: 18px 20px;
+    border-radius: 16px;
+    text-align: center;
+    background: rgba(255,77,61,0.07);
+    border: 1px dashed rgba(255,210,74,0.35);
+  }
+  .howto .t {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .howto .m { font-size: clamp(13px, 3.4vw, 16px); line-height: 1.7; font-weight: 700; }
+  .howto .m b {
+    color: #2a0d05;
+    background: linear-gradient(100deg, var(--gold), #ffb64a);
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-family: var(--font-disp);
+    font-weight: 400;
+    display: inline-block;
+    margin: 0 2px;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="fireworks"></canvas>
+<div class="lantern-row" id="lanterns"></div>
+
+<div class="page wrap">
+
+  <div class="head">
+    <span class="kicker" id="kicker">Summer Festival Queue</span>
+    <h1 id="title">夏祭り 順番待ち</h1>
+    <div class="sub" id="subtitle">花火大会コラボ配信</div>
+    <div class="meta">
+      <span class="pill" id="countPill">—</span>
+      <span class="pill live"><span class="dot"></span><span id="clock">--:--</span></span>
+    </div>
+  </div>
+
+  <!-- NOW -->
+  <section id="nowSection">
+    <div class="sec-label"><b id="nowLabel">NOW</b> <span id="nowLabelJa">出演中</span></div>
+    <div class="now-grid" id="nowGrid"></div>
+  </section>
+
+  <!-- NEXT / 空状態 -->
+  <section id="nextSection">
+    <div class="sec-label" id="nextSecLabel"><b>NEXT</b> <span>次の方</span></div>
+    <div id="nextArea"></div>
+  </section>
+
+  <!-- このあと -->
+  <section id="upSection" style="display:none">
+    <div class="sec-label" id="upLabel">このあと</div>
+    <div id="upList"></div>
+    <div class="more-note" id="moreNote" style="display:none"></div>
+  </section>
+
+  <!-- 並び方 -->
+  <div class="howto">
+    <div class="t">HOW TO JOIN</div>
+    <div class="m" id="howto"></div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="theme.js"></script>
+<script src="queue-core.js"></script>
+<script>
+(function () {
+  const CFG = window.APP_CONFIG;
+  const { Store, escapeHtml } = window.QueueCore;
+  const L = CFG.labels;
+
+  /* --- 固定文言 --- */
+  document.title = CFG.app.title;
+  document.getElementById('title').textContent = CFG.app.title;
+  document.getElementById('subtitle').textContent = CFG.app.subtitle;
+  document.getElementById('nowLabel').textContent = L.now;
+  document.getElementById('nowLabelJa').textContent = L.nowJa;
+  document.getElementById('nextSecLabel').innerHTML =
+    '<b>' + escapeHtml(L.next) + '</b> <span>' + escapeHtml(L.nextJa) + '</span>';
+  document.getElementById('upLabel').textContent = L.upcoming;
+  document.getElementById('howto').innerHTML =
+    escapeHtml(CFG.app.howToJoin).replace(
+      escapeHtml('{keyword}'),
+      '<b>' + escapeHtml(CFG.keywords.join[0]) + '</b>'
+    );
+
+  /* --- 提灯 --- */
+  const lr = document.getElementById('lanterns');
+  for (let i = 0; i < 9; i++) {
+    const d = document.createElement('div');
+    d.className = 'lantern';
+    d.style.left = (4 + i * 11.5) + '%';
+    d.style.animationDelay = (i * 0.32) + 's';
+    lr.appendChild(d);
+  }
+
+  /* --- 花火 --- */
+  const fw = window.Fireworks(document.getElementById('fireworks'));
+
+  /* --- 時計 --- */
+  function clock() {
+    const n = new Date();
+    document.getElementById('clock').textContent =
+      String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+  }
+  clock(); setInterval(clock, 10000);
+
+  /* --- 描画 --- */
+  const hon = CFG.app.honorific ? '<span class="hon">' + escapeHtml(CFG.app.honorific) + '</span>' : '';
+  let prevNowKeys = '';
+
+  function render(state) {
+    const now = state.now || [];
+    const queue = state.queue || [];
+
+    document.body.classList.toggle('has-now', now.length > 0);
+
+    document.getElementById('countPill').textContent =
+      queue.length > 0 ? L.waitingCount.replace('{n}', queue.length) : L.waiting + ' 0';
+
+    /* NOW */
+    const nowSec = document.getElementById('nowSection');
+    const nowGrid = document.getElementById('nowGrid');
+    if (now.length > 0) {
+      nowSec.classList.add('on');
+      nowGrid.classList.toggle('multi', now.length > 1);
+      nowGrid.innerHTML = now.map(p => `
+        <div class="now-card">
+          <div class="now-tag">${escapeHtml(L.now)} <i>${escapeHtml(L.nowJa)}</i></div>
+          <div class="now-name">${escapeHtml(p.name)}${hon}</div>
+        </div>`).join('');
+    } else {
+      nowSec.classList.remove('on');
+      nowGrid.innerHTML = '';
+    }
+
+    // NOW の顔ぶれが変わったら花火を打ち上げる
+    const nowKeys = now.map(p => p.id).join(',');
+    if (nowKeys && nowKeys !== prevNowKeys) fw.celebrate();
+    prevNowKeys = nowKeys;
+
+    /* NEXT */
+    const nextArea = document.getElementById('nextArea');
+    const nextSec  = document.getElementById('nextSection');
+    if (queue.length > 0) {
+      nextSec.style.display = '';
+      const p = queue[0];
+      nextArea.innerHTML = `
+        <div class="next-card">
+          <div class="next-num"><div class="n">1</div><div class="l">NO.</div></div>
+          <div class="next-body">
+            <div class="next-tag">${escapeHtml(L.next)}<i>${escapeHtml(L.nextJa)}</i></div>
+            <div class="next-name">${escapeHtml(p.name)}${hon}</div>
+          </div>
+        </div>`;
+    } else if (now.length > 0) {
+      nextSec.style.display = 'none';
+      nextArea.innerHTML = '';
+    } else {
+      nextSec.style.display = '';
+      nextArea.innerHTML = `
+        <div class="empty">
+          <div class="big">${escapeHtml(L.emptyTitle)}</div>
+          <div class="sub">${escapeHtml(L.emptySub)}</div>
+        </div>`;
+    }
+
+    /* このあと */
+    const upSec  = document.getElementById('upSection');
+    const upList = document.getElementById('upList');
+    const note   = document.getElementById('moreNote');
+    const rest   = queue.slice(1);
+    const show   = rest.slice(0, CFG.rules.upcomingCount);
+    if (show.length > 0) {
+      upSec.style.display = '';
+      upList.innerHTML = show.map((p, i) => `
+        <div class="up-item">
+          <span class="up-num">${i + 2}</span>
+          <span class="up-name">${escapeHtml(p.name)}${CFG.app.honorific ? escapeHtml(CFG.app.honorific) : ''}</span>
+        </div>`).join('');
+      const more = rest.length - show.length;
+      note.style.display = more > 0 ? '' : 'none';
+      note.textContent = more > 0 ? `ほか ${more} 名が待機中` : '';
+    } else {
+      upSec.style.display = 'none';
+    }
+  }
+
+  Store.init().onChange(render);
+  render(Store.state);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+/* =============================================================
+ *  theme.css — 夏祭り＆花火 共通スタイル
+ *  色は theme.js が config.js から CSS 変数に流し込みます
+ * ============================================================= */
+
+:root {
+  --bg-top: #0a0f2c;
+  --bg-bottom: #1a0e2e;
+  --surface: #151a3d;
+  --border: #2c356b;
+  --lantern: #ff4d3d;
+  --gold: #ffd24a;
+  --hanabi-a: #ff7ac4;
+  --hanabi-b: #5ce1e6;
+  --hanabi-c: #b18cff;
+  --text: #fff6e5;
+  --muted: #8a90c4;
+
+  --font-jp: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+  --font-disp: 'Dela Gothic One', 'Zen Kaku Gothic New', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  min-height: 100%;
+  background: var(--bg-bottom);
+  color: var(--text);
+  font-family: var(--font-jp);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 夜空グラデーション ---------- */
+body {
+  position: relative;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 100%, rgba(255,77,61,0.10) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+/* ---------- 麻の葉風の和柄テクスチャ ---------- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(30deg,  rgba(255,210,74,0.030) 1px, transparent 1px),
+    linear-gradient(-30deg, rgba(255,210,74,0.030) 1px, transparent 1px),
+    linear-gradient(90deg,  rgba(255,210,74,0.022) 1px, transparent 1px);
+  background-size: 46px 80px, 46px 80px, 46px 80px;
+}
+
+/* ---------- 花火キャンバス ---------- */
+#fireworks {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+}
+
+/* ---------- 提灯（左右に吊るす飾り） ---------- */
+.lantern-row {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.lantern-row::before {
+  content: '';
+  position: absolute;
+  top: 14px; left: -5%; right: -5%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,210,74,0.35) 12%, rgba(255,210,74,0.35) 88%, transparent);
+  border-radius: 2px;
+}
+.lantern {
+  position: absolute;
+  top: 12px;
+  width: 26px; height: 34px;
+  border-radius: 45% 45% 42% 42% / 34% 34% 40% 40%;
+  background: linear-gradient(180deg, var(--lantern), #b8221a);
+  box-shadow: 0 0 18px rgba(255,77,61,0.55), inset 0 -6px 12px rgba(0,0,0,0.35);
+  animation: sway 4.5s ease-in-out infinite;
+  transform-origin: 50% -8px;
+}
+.lantern::before,
+.lantern::after {
+  content: '';
+  position: absolute;
+  left: 4px; right: 4px;
+  height: 4px;
+  background: #2a0f10;
+  border-radius: 2px;
+}
+.lantern::before { top: -2px; }
+.lantern::after  { bottom: -2px; }
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50%      { transform: rotate(5deg); }
+}
+
+/* ---------- 汎用 ---------- */
+.wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(21,26,61,0.92), rgba(15,18,45,0.92));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(3px);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), var(--lantern), transparent);
+  opacity: 0.7;
+}
+
+button, .btn {
+  cursor: pointer;
+  font-family: var(--font-jp);
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  transition: transform .15s, box-shadow .2s, background .2s, border-color .2s, color .2s;
+}
+button:active { transform: translateY(1px); }
+
+input[type="text"], textarea {
+  width: 100%;
+  background: rgba(8,11,32,0.85);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--font-jp);
+  font-size: 15px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+input[type="text"]:focus, textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255,210,74,0.16);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.25); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

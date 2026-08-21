@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>テスト用コメント配信</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 0;
+    min-height: 100vh;
+  }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  /* ===== 左：操作パネル ===== */
+  .panel { padding: 20px; border-right: 1px solid var(--border); }
+
+  .ptitle {
+    font-family: var(--font-disp);
+    font-size: 20px;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+  .pdesc { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; }
+
+  .blabel {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--muted); margin: 18px 0 8px;
+  }
+  .blabel::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  textarea { min-height: 78px; resize: vertical; line-height: 1.6; }
+
+  .btn { width: 100%; padding: 12px; font-size: 14px; margin-top: 8px;
+         background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--border); }
+  .btn:hover { border-color: var(--gold); color: var(--gold); }
+  .btn.send {
+    background: linear-gradient(100deg, var(--gold), #ffab3d);
+    color: #2a0d05; border: none; font-weight: 900; font-size: 15px; padding: 14px;
+  }
+  .btn.join  { background: rgba(92,225,230,.10); color: var(--hanabi-b); border-color: rgba(92,225,230,.35); }
+  .btn.join:hover { background: rgba(92,225,230,.22); color: var(--hanabi-b); }
+  .btn.leave { background: rgba(255,77,61,.10); color: var(--lantern); border-color: rgba(255,77,61,.32); }
+  .btn.leave:hover { background: rgba(255,77,61,.22); color: var(--lantern); }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row2 .btn { margin-top: 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    font-size: 12px; padding: 6px 12px; border-radius: 999px;
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--muted);
+  }
+  .chip:hover { border-color: var(--gold); color: var(--gold); }
+
+  .verdict {
+    margin-top: 14px; padding: 11px 13px; border-radius: 10px;
+    background: rgba(0,0,0,.3); border: 1px solid var(--border);
+    font-size: 12px; line-height: 1.75; color: var(--muted);
+  }
+  .verdict b { color: var(--gold); font-family: var(--font-mono); font-size: 11px; }
+  .verdict .n { color: var(--text); font-weight: 700; }
+
+  .note { font-size: 11px; color: var(--muted); line-height: 1.8; margin-top: 14px; }
+  .note code { font-family: var(--font-mono); color: var(--gold); }
+
+  .hlink {
+    display: inline-block; font-size: 12px; color: var(--muted); text-decoration: none;
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 4px 4px 0 0;
+  }
+  .hlink:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ===== 右：模擬コメント欄 ===== */
+  .stream {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+  @media (max-width: 900px) { .stream { height: 70vh; } }
+
+  .stream-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: rgba(10,15,44,.85);
+  }
+  .stream-head .t { font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: var(--gold); text-transform: uppercase; }
+  .stream-head .c { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+  /* 下から積み上がる：最新が一番下、古いものが上へ流れる */
+  #commentList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .comment-item {
+    padding: 9px 12px;
+    margin-top: 7px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.035);
+    border-left: 3px solid var(--border);
+    animation: slideUp .32s ease;
+    flex-shrink: 0;
+  }
+  @keyframes slideUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: translateY(0); } }
+
+  .comment-item .cname {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--hanabi-b);
+    margin-bottom: 2px;
+  }
+  .comment-item .cbody {
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .comment-item.sys { border-left-color: var(--gold); background: rgba(255,210,74,.07); }
+  .comment-item.sys .cname { color: var(--gold); }
+  .comment-item.sys .cbody { display: none; }
+  .comment-item.kw { border-left-color: var(--lantern); background: rgba(255,77,61,.07); }
+
+  .stream-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- 左：操作 -->
+  <div class="panel wrap">
+    <div class="ptitle">テスト用コメント配信</div>
+    <div class="pdesc">
+      配信を始めなくても動作確認できるように、ここから疑似コメントを流せます。<br>
+      右のコメント欄は本番と同じ構造（1行目＝ユーザー名／2行目以降＝本文、最新が一番下）です。
+    </div>
+
+    <div class="blabel">ユーザー名</div>
+    <input type="text" id="uname" placeholder="例：ぺんぎん" maxlength="30" autocomplete="off" value="ぺんぎん">
+
+    <div class="blabel">コメント本体</div>
+    <textarea id="ubody" placeholder="例：予約！"></textarea>
+    <div class="chips" id="chips"></div>
+
+    <button class="btn send" id="btnSend">コメントを送信</button>
+
+    <div class="blabel">コラボ配信</div>
+    <div class="row2">
+      <button class="btn join"  id="btnJoin">コラボ参加</button>
+      <button class="btn leave" id="btnLeave">コラボ退出</button>
+    </div>
+
+    <div class="verdict" id="verdict">
+      <b>JUDGE</b><br>まだコメントを送っていません
+    </div>
+
+    <div class="blabel">リンク</div>
+    <a class="hlink" href="index.html" target="_blank">順番待ち画面 ↗</a>
+    <a class="hlink" href="#" id="adminLink" target="_blank">管理パネル ↗</a>
+
+    <div class="note">
+      判定に使われる設定：<br>
+      並ぶキーワード <code id="nKw"></code><br>
+      参加 <code id="nJoin"></code><br>
+      退出 <code id="nLeave"></code><br><br>
+      ※管理パネルを開いている間だけコメントが処理されます。
+    </div>
+  </div>
+
+  <!-- 右：模擬コメント欄 -->
+  <div class="stream wrap">
+    <div class="stream-head">
+      <span class="t">Live Comments</span>
+      <span class="c" id="cCount">0 件</span>
+    </div>
+    <div id="commentList">
+      <div class="stream-empty" id="streamEmpty">コメントはまだありません</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="theme.js"></script>
+<script src="queue-core.js"></script>
+<script>
+(function () {
+  const CFG = window.APP_CONFIG;
+  const { interpret, escapeHtml, isJoinKeyword } = window.QueueCore;
+
+  document.getElementById('nKw').textContent    = CFG.keywords.join.join(' / ');
+  document.getElementById('nJoin').textContent  = CFG.systemMessage.collabJoin;
+  document.getElementById('nLeave').textContent = CFG.systemMessage.collabLeave;
+
+  // 管理パネルへのリンク（同フォルダの admin-*.html を推測せず、手入力を促す）
+  const adminGuess = localStorage.getItem('matsuri-admin-url') || '';
+  const al = document.getElementById('adminLink');
+  al.href = adminGuess || '#';
+  al.onclick = (e) => {
+    if (!adminGuess) {
+      e.preventDefault();
+      const u = prompt('管理パネルのファイル名を入力してください（例: admin-xxxxxxxx.html）');
+      if (u) { localStorage.setItem('matsuri-admin-url', u); location.reload(); }
+    }
+  };
+
+  /* ---- コメント送信チャンネル ---- */
+  let bc = null;
+  try { bc = new BroadcastChannel(CFG.storage.commentChannel); } catch (_) {}
+
+  let count = 0;
+
+  function push(rawText) {
+    const r = interpret(rawText);
+    const lines = rawText.split('\n');
+    const name = lines[0] || '';
+    const body = lines.slice(1).join('\n');
+
+    // 画面に追加（最新が一番下）
+    const list = document.getElementById('commentList');
+    const empty = document.getElementById('streamEmpty');
+    if (empty) empty.remove();
+
+    const div = document.createElement('div');
+    div.className = 'comment-item' +
+      (r.type === 'collab-join' || r.type === 'collab-leave' ? ' sys' :
+       r.type === 'join' ? ' kw' : '');
+    div.dataset.id = 'c' + (++count);
+    div.innerHTML =
+      '<div class="cname">' + escapeHtml(name) + '</div>' +
+      '<div class="cbody">' + escapeHtml(body) + '</div>';
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+    document.getElementById('cCount').textContent = count + ' 件';
+
+    // 送信
+    if (bc) { try { bc.postMessage({ type: 'comment', text: rawText }); } catch (_) {} }
+
+    // 判定結果の表示
+    const label = {
+      'join':         '列の最後尾に追加',
+      'collab-join':  'コラボ参加 → NOW に表示',
+      'collab-leave': 'コラボ退出 → NOW から外す',
+      'none':         '何もしない（通常コメント）'
+    }[r.type];
+    document.getElementById('verdict').innerHTML =
+      '<b>JUDGE</b><br>種別：<span class="n">' + escapeHtml(label) + '</span><br>' +
+      '対象：<span class="n">' + escapeHtml(r.name || '—') + '</span>';
+  }
+
+  /* ---- ボタン ---- */
+  const uname = document.getElementById('uname');
+  const ubody = document.getElementById('ubody');
+
+  function nameOrAlert() {
+    const n = uname.value.trim();
+    if (!n) { uname.focus(); return null; }
+    return n;
+  }
+
+  document.getElementById('btnSend').onclick = () => {
+    const n = nameOrAlert(); if (!n) return;
+    push(n + '\n' + ubody.value);
+    ubody.value = '';
+    ubody.focus();
+  };
+
+  document.getElementById('btnJoin').onclick = () => {
+    const n = nameOrAlert(); if (!n) return;
+    push(CFG.systemMessage.collabJoin.replace('{name}', n));
+  };
+
+  document.getElementById('btnLeave').onclick = () => {
+    const n = nameOrAlert(); if (!n) return;
+    push(CFG.systemMessage.collabLeave.replace('{name}', n));
+  };
+
+  ubody.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) document.getElementById('btnSend').click();
+  });
+
+  /* ---- クイック入力チップ ---- */
+  const chips = document.getElementById('chips');
+  const samples = CFG.keywords.join.concat(['こんばんは！', 'かわいい〜', '888888']);
+  samples.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = s;
+    b.onclick = () => { ubody.value = s; ubody.focus(); };
+    chips.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>

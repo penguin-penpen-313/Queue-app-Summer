@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>管理パネル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { min-height: 100vh; }
+
+  header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    padding: 10px 18px;
+    background: rgba(10,15,44,0.92);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--lantern);
+    box-shadow: 0 0 12px var(--lantern);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  .brand .t { font-family: var(--font-mono); font-size: 12px; letter-spacing: .22em; color: var(--gold); text-transform: uppercase; }
+
+  .head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hlink {
+    font-size: 12px; color: var(--muted); text-decoration: none;
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px;
+    transition: all .2s;
+  }
+  .hlink:hover { border-color: var(--gold); color: var(--gold); }
+
+  .engine {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .engine .led { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+  .engine.ok  { color: var(--hanabi-b); border-color: rgba(92,225,230,.35); }
+  .engine.ok  .led { background: var(--hanabi-b); box-shadow: 0 0 8px var(--hanabi-b); animation: pulse 1.6s infinite; }
+  .engine.err { color: var(--lantern); border-color: rgba(255,77,61,.4); }
+  .engine.err .led { background: var(--lantern); }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 0;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .main { grid-template-columns: 1fr; } }
+
+  .left  { padding: 18px; border-right: 1px solid var(--border); min-height: calc(100vh - 52px); }
+  .right { padding: 18px; background: rgba(10,13,38,0.6); position: sticky; top: 52px; }
+  @media (max-width: 860px) { .right { position: static; border-top: 1px solid var(--border); } .left { border-right: none; } }
+
+  .sec {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .25em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 4px 2px 12px;
+  }
+  .sec::after { content:''; flex:1; height:1px; background: linear-gradient(90deg,var(--border),transparent); }
+  .sec .cnt {
+    font-size: 11px; color: var(--gold); background: rgba(255,210,74,.1);
+    border: 1px solid rgba(255,210,74,.25); border-radius: 999px; padding: 2px 9px; letter-spacing: .05em;
+  }
+
+  /* NOW リスト */
+  .now-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 15px; margin-bottom: 8px; border-radius: 12px;
+    background: linear-gradient(120deg, rgba(255,210,74,.15), rgba(255,77,61,.09));
+    border: 1px solid rgba(255,210,74,.45);
+  }
+  .now-row .tag {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: .18em;
+    color: #2a0d05; background: var(--gold); padding: 3px 8px; border-radius: 5px; flex-shrink: 0;
+  }
+  .now-row .nm { flex: 1; font-weight: 700; font-size: 18px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 待ち行列 */
+  ul.qlist { list-style: none; min-height: 60px; }
+  .q-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; margin-bottom: 7px; border-radius: 12px;
+    background: rgba(255,255,255,.035);
+    border: 1px solid rgba(255,255,255,.07);
+    cursor: grab; user-select: none;
+    transition: border-color .18s, background .18s, transform .12s;
+  }
+  .q-row:hover { border-color: rgba(255,210,74,.35); background: rgba(255,210,74,.05); }
+  .q-row.dragging { opacity: .35; }
+  .q-row.drag-over { border-color: var(--gold); border-style: dashed; transform: scale(1.015); }
+  .q-row:first-child { border-color: rgba(177,140,255,.5); background: rgba(177,140,255,.07); }
+
+  .handle { color: var(--muted); letter-spacing: -2px; font-size: 17px; line-height: 1; }
+  .q-num  { font-family: var(--font-mono); font-size: 13px; width: 26px; text-align: center; color: var(--muted); flex-shrink: 0; }
+  .q-row:first-child .q-num { color: var(--hanabi-c); font-weight: 700; }
+  .q-name { flex: 1; font-weight: 700; font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge-next {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em;
+    color: var(--hanabi-c); border: 1px solid var(--hanabi-c);
+    padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+  }
+  .q-row:not(:first-child) .badge-next { display: none; }
+  .via {
+    font-family: var(--font-mono); font-size: 9px; color: var(--muted);
+    border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+  }
+
+  .acts { display: flex; gap: 4px; flex-shrink: 0; }
+  .ico {
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; font-size: 13px; background: rgba(255,255,255,.06); color: var(--muted);
+  }
+  .ico:hover { background: rgba(255,210,74,.2); color: var(--gold); }
+  .ico.call:hover { background: rgba(92,225,230,.2); color: var(--hanabi-b); }
+  .ico.del:hover  { background: rgba(255,77,61,.25); color: var(--lantern); }
+
+  .empty-box { text-align: center; padding: 34px 16px; color: var(--muted); font-size: 13px; }
+
+  /* 右パネル */
+  .block { margin-bottom: 22px; }
+  .blabel {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 9px;
+  }
+  .blabel::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  .btn {
+    width: 100%; padding: 12px; font-size: 14px; margin-bottom: 7px;
+    background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--border);
+  }
+  .btn:hover { border-color: var(--gold); color: var(--gold); }
+  .btn.primary {
+    background: linear-gradient(100deg, var(--gold), #ffab3d);
+    color: #2a0d05; border: none; font-weight: 900; padding: 15px; font-size: 15px;
+    box-shadow: 0 6px 22px rgba(255,180,60,.25);
+  }
+  .btn.primary:hover { box-shadow: 0 8px 30px rgba(255,180,60,.45); color: #2a0d05; }
+  .btn.danger { color: var(--lantern); border-color: rgba(255,77,61,.3); background: rgba(255,77,61,.08); }
+  .btn.danger:hover { background: rgba(255,77,61,.2); color: var(--lantern); border-color: var(--lantern); }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-bottom: 18px; }
+  .stat { text-align: center; padding: 11px 6px; border-radius: 10px; background: rgba(0,0,0,.28); border: 1px solid var(--border); }
+  .stat .n { font-family: var(--font-mono); font-size: 21px; font-weight: 700; color: var(--gold); line-height: 1; }
+  .stat .l { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+  .log {
+    max-height: 210px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: rgba(0,0,0,.3); padding: 8px;
+    font-size: 12px; line-height: 1.65;
+  }
+  .log div { padding: 3px 4px; border-bottom: 1px dashed rgba(255,255,255,.05); color: rgba(255,246,229,.85); }
+  .log div:last-child { border-bottom: none; }
+  .log time { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-right: 7px; }
+
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.8; margin-top: 6px; }
+  .hint code { font-family: var(--font-mono); color: var(--gold); }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%) translateY(90px);
+    background: var(--surface); border: 1px solid var(--gold); color: var(--gold);
+    padding: 11px 22px; border-radius: 10px; font-size: 13px; font-weight: 700;
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1); z-index: 300;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="mark"></span><span class="t" id="brandT">Admin Panel</span></div>
+  <div class="head-right">
+    <span class="engine" id="engine"><span class="led"></span><span id="engineTxt">停止中</span></span>
+    <a class="hlink" href="index.html" target="_blank">順番待ち画面 ↗</a>
+    <a class="hlink" href="test-comments.html" target="_blank">テストコメント ↗</a>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- 左：リスト -->
+  <div class="left">
+    <div id="nowWrap" style="display:none">
+      <div class="sec">出演中 (NOW) <span class="cnt" id="nowCnt">0</span></div>
+      <div id="nowList"></div>
+    </div>
+
+    <div class="sec" style="margin-top:20px">順番待ちリスト <span class="cnt" id="qCnt">0人</span></div>
+    <ul class="qlist" id="qList"></ul>
+  </div>
+
+  <!-- 右：操作 -->
+  <div class="right">
+    <div class="stats">
+      <div class="stat"><div class="n" id="sWait">0</div><div class="l">待機</div></div>
+      <div class="stat"><div class="n" id="sNow">0</div><div class="l">出演中</div></div>
+      <div class="stat"><div class="n" id="sDone">0</div><div class="l">完了</div></div>
+    </div>
+
+    <div class="block">
+      <button class="btn primary" id="btnNext">▶ 先頭の方を呼ぶ（NOWへ）</button>
+    </div>
+
+    <div class="block">
+      <div class="blabel">手動で追加</div>
+      <input type="text" id="addName" placeholder="ユーザー名を入力" maxlength="30" autocomplete="off">
+      <button class="btn" id="btnAdd">＋ 最後尾に追加</button>
+      <button class="btn" id="btnAddFront">⬆ 先頭に追加</button>
+    </div>
+
+    <div class="block">
+      <div class="blabel">コメント取得</div>
+      <button class="btn" id="btnEngine">■ エンジン停止</button>
+      <div class="hint">
+        モード: <code id="modeTxt"></code><br>
+        URL: <code id="urlTxt"></code><br>
+        キーワード: <code id="kwTxt"></code>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="blabel">操作ログ</div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="block">
+      <div class="blabel">危険な操作</div>
+      <button class="btn danger" id="btnClear">⚠ 全リセット</button>
+      <div class="hint">
+        ドラッグ／↑↓ で順番変更<br>
+        ▶ でNOWへ、✕ で削除
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="theme.js"></script>
+<script src="queue-core.js"></script>
+<script>
+(function () {
+  const CFG = window.APP_CONFIG;
+  const { Store, Engine, CommentSource, escapeHtml } = window.QueueCore;
+
+  document.title = CFG.labels.adminTitle + ' | ' + CFG.app.title;
+  document.getElementById('brandT').textContent = CFG.labels.adminTitle;
+  document.getElementById('modeTxt').textContent = CFG.comment.mode;
+  document.getElementById('urlTxt').textContent  = CFG.comment.url || '(未設定)';
+  document.getElementById('kwTxt').textContent   = CFG.keywords.join.join(' / ');
+
+  /* ---------- toast ---------- */
+  let tt = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  /* ---------- 描画 ---------- */
+  let dragFrom = null;
+
+  function render(state) {
+    const q = state.queue || [], now = state.now || [];
+
+    document.getElementById('sWait').textContent = q.length;
+    document.getElementById('sNow').textContent  = now.length;
+    document.getElementById('sDone').textContent = state.doneCount || 0;
+    document.getElementById('qCnt').textContent  = q.length + '人';
+    document.getElementById('nowCnt').textContent = now.length;
+
+    /* NOW */
+    const nw = document.getElementById('nowWrap');
+    nw.style.display = now.length ? '' : 'none';
+    document.getElementById('nowList').innerHTML = now.map((p, i) => `
+      <div class="now-row">
+        <span class="tag">NOW</span>
+        <span class="nm">${escapeHtml(p.name)}</span>
+        <div class="acts">
+          <button class="ico del" title="出番を終了" data-act="endnow" data-i="${i}">✓</button>
+        </div>
+      </div>`).join('');
+
+    /* 待ち行列 */
+    const list = document.getElementById('qList');
+    if (q.length === 0) {
+      list.innerHTML = '<div class="empty-box">順番待ちはいません</div>';
+      return;
+    }
+    list.innerHTML = q.map((p, i) => `
+      <li class="q-row" draggable="true" data-i="${i}">
+        <span class="handle">⠿</span>
+        <span class="q-num">${i + 1}</span>
+        <span class="q-name">${escapeHtml(p.name)}</span>
+        <span class="badge-next">NEXT</span>
+        <span class="via">${escapeHtml(p.via === 'admin' ? '手動' : p.via === 'guest' ? 'ゲスト' : 'コメント')}</span>
+        <div class="acts">
+          <button class="ico"      title="上へ"   data-act="up"   data-i="${i}">↑</button>
+          <button class="ico"      title="下へ"   data-act="down" data-i="${i}">↓</button>
+          <button class="ico call" title="NOWへ"  data-act="call" data-i="${i}">▶</button>
+          <button class="ico del"  title="削除"   data-act="del"  data-i="${i}">✕</button>
+        </div>
+      </li>`).join('');
+
+    list.querySelectorAll('.q-row').forEach(li => {
+      li.addEventListener('dragstart', e => { dragFrom = +li.dataset.i; li.classList.add('dragging'); });
+      li.addEventListener('dragover',  e => { e.preventDefault(); li.classList.add('drag-over'); });
+      li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+      li.addEventListener('drop', e => {
+        e.preventDefault(); li.classList.remove('drag-over');
+        const to = +li.dataset.i;
+        if (dragFrom !== null && dragFrom !== to) Store.moveTo(dragFrom, to);
+        dragFrom = null;
+      });
+      li.addEventListener('dragend', () => {
+        li.classList.remove('dragging');
+        list.querySelectorAll('.q-row').forEach(x => x.classList.remove('drag-over'));
+      });
+    });
+
+    renderLog(state);
+  }
+
+  function renderLog(state) {
+    const el = document.getElementById('log');
+    const rows = (state.log || []).slice(0, 40);
+    el.innerHTML = rows.length
+      ? rows.map(r => {
+          const d = new Date(r.t);
+          const hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+          return `<div><time>${hm}</time>${escapeHtml(r.text)}</div>`;
+        }).join('')
+      : '<div style="color:var(--muted)">まだ操作はありません</div>';
+  }
+
+  /* ---------- 操作 ---------- */
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const i = +b.dataset.i;
+    switch (b.dataset.act) {
+      case 'up':     Store.moveUp(i); break;
+      case 'down':   Store.moveDown(i); break;
+      case 'call':   Store.collabJoin(Store.state.queue[i].name); break;
+      case 'del':    Store.removeAt(i); break;
+      case 'endnow': Store.removeNowAt(i); break;
+    }
+  });
+
+  document.getElementById('btnNext').onclick = () => {
+    const r = Store.callNext();
+    toast(r.ok ? '先頭の方をNOWにしました' : '順番待ちがいません');
+  };
+
+  function addFrom(front) {
+    const el = document.getElementById('addName');
+    const name = el.value.trim();
+    if (!name) return;
+    const r = front ? Store.enqueueFront(name) : Store.enqueue(name, { via: 'admin' });
+    if (!r.ok && r.reason === 'duplicate') toast(`「${name}」は既に登録済み`);
+    else toast(`「${name}」を追加しました`);
+    el.value = ''; el.focus();
+  }
+  document.getElementById('btnAdd').onclick = () => addFrom(false);
+  document.getElementById('btnAddFront').onclick = () => addFrom(true);
+  document.getElementById('addName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addFrom(false);
+  });
+
+  document.getElementById('btnClear').onclick = () => {
+    if (confirm('順番待ち・出演中・ログをすべて消去します。よろしいですか？')) {
+      Store.clearAll(); toast('リセットしました');
+    }
+  };
+
+  /* ---------- コメントエンジン ---------- */
+  let running = false;
+  function setEngineUi() {
+    const el = document.getElementById('engine');
+    const tx = document.getElementById('engineTxt');
+    const bt = document.getElementById('btnEngine');
+    const st = CommentSource.status || 'stopped';
+    if (!running) {
+      el.className = 'engine'; tx.textContent = 'エンジン停止中';
+      bt.textContent = '▶ エンジン開始';
+    } else if (/error|unknown/.test(st)) {
+      el.className = 'engine err'; tx.textContent = st;
+      bt.textContent = '■ エンジン停止';
+    } else {
+      el.className = 'engine ok'; tx.textContent = 'コメント監視中 / ' + CFG.comment.mode;
+      bt.textContent = '■ エンジン停止';
+    }
+  }
+
+  function startEngine() {
+    Engine.start((r, res) => {
+      if (r.type === 'join' && res && !res.ok && res.reason === 'duplicate') {
+        toast(`「${r.name}」は既に並んでいます`);
+      } else if (r.type === 'join' && res && res.ok) {
+        toast(`「${r.name}」が列に並びました（${res.position}番目）`);
+      } else if (r.type === 'collab-join' && res && res.ok) {
+        toast(`「${r.name}」がコラボ参加 → NOW`);
+      } else if (r.type === 'collab-leave' && res && res.ok) {
+        toast(`「${r.name}」が退出`);
+      }
+      setEngineUi();
+    });
+    running = true;
+    setTimeout(setEngineUi, 300);
+    setEngineUi();
+  }
+
+  document.getElementById('btnEngine').onclick = () => {
+    if (running) { Engine.stop(); running = false; setEngineUi(); }
+    else startEngine();
+  };
+
+  setInterval(setEngineUi, 3000);
+
+  /* ---------- 起動 ---------- */
+  Store.init().onChange(render);
+  render(Store.state);
+  startEngine();
+})();
+</script>
+</body>
+</html>
