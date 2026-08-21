@@ -186,6 +186,7 @@
   <div class="brand"><span class="mark"></span><span class="t" id="brandT">Admin Panel</span></div>
   <div class="head-right">
     <span class="engine" id="engine"><span class="led"></span><span id="engineTxt">停止中</span></span>
+    <button class="hlink" id="btnReality" style="background:transparent;font-family:inherit;">REALITYコメントを開く ↗</button>
     <a class="hlink" href="index.html" target="_blank">順番待ち画面 ↗</a>
     <a class="hlink" href="test-comments.html" target="_blank">テストコメント ↗</a>
   </div>
@@ -226,9 +227,11 @@
     <div class="block">
       <div class="blabel">コメント取得</div>
       <button class="btn" id="btnEngine">■ エンジン停止</button>
+      <button class="btn" id="btnReality2">REALITYコメント画面を開く</button>
       <div class="hint">
         モード: <code id="modeTxt"></code><br>
-        URL: <code id="urlTxt"></code><br>
+        橋渡し: <code id="bridgeTxt">未接続</code><br>
+        URL: <code id="urlTxt" style="word-break:break-all"></code><br>
         キーワード: <code id="kwTxt"></code>
       </div>
     </div>
@@ -257,7 +260,17 @@
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
-  const { Store, Engine, CommentSource, escapeHtml } = window.QueueCore;
+  const { Store, Engine, CommentSource, CommentBus, escapeHtml } = window.QueueCore;
+
+  /* REALITYのコメント画面を開く（このタブが親になるので橋渡しが自動接続される） */
+  let realityWin = null;
+  function openReality() {
+    if (!CFG.comment.url) { alert('config.js の comment.url が未設定です'); return; }
+    if (realityWin && !realityWin.closed) { realityWin.focus(); return; }
+    realityWin = window.open(CFG.comment.url, 'reality-comments');
+  }
+  document.getElementById('btnReality').onclick = openReality;
+  document.getElementById('btnReality2').onclick = openReality;
 
   document.title = CFG.labels.adminTitle + ' | ' + CFG.app.title;
   document.getElementById('brandT').textContent = CFG.labels.adminTitle;
@@ -396,6 +409,14 @@
     const tx = document.getElementById('engineTxt');
     const bt = document.getElementById('btnEngine');
     const st = CommentSource.status || 'stopped';
+
+    const fresh = CommentBus.bridgeConnected && (Date.now() - CommentBus.bridgeLastAt < 12000);
+    const bg = document.getElementById('bridgeTxt');
+    if (bg) {
+      bg.textContent = fresh ? '接続中（REALITY）'
+                     : CommentBus.bridgeLastAt ? '切断（最終受信あり）' : '未接続';
+      bg.style.color = fresh ? 'var(--hanabi-b)' : 'var(--muted)';
+    }
     if (!running) {
       el.className = 'engine'; tx.textContent = 'エンジン停止中';
       bt.textContent = '▶ エンジン開始';
@@ -409,7 +430,7 @@
   }
 
   function startEngine() {
-    Engine.start((r, res) => {
+    Engine.start(10, (r, res) => {
       if (r.type === 'join' && res && !res.ok && res.reason === 'duplicate') {
         toast(`「${r.name}」は既に並んでいます`);
       } else if (r.type === 'join' && res && res.ok) {
@@ -431,7 +452,7 @@
     else startEngine();
   };
 
-  setInterval(setEngineUi, 3000);
+  setInterval(setEngineUi, 1000);
 
   /* ---------- 起動 ---------- */
   Store.init().onChange(render);

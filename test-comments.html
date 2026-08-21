@@ -68,6 +68,13 @@
   .verdict b { color: var(--gold); font-family: var(--font-mono); font-size: 11px; }
   .verdict .n { color: var(--text); font-weight: 700; }
 
+  .ebadge {
+    margin-top: 10px; padding: 9px 12px; border-radius: 9px;
+    font-family: var(--font-mono); font-size: 11px; text-align: center;
+    border: 1px solid var(--border); color: var(--muted); background: rgba(0,0,0,.25);
+  }
+  .ebadge.ok { color: var(--hanabi-b); border-color: rgba(92,225,230,.4); background: rgba(92,225,230,.08); }
+
   .note { font-size: 11px; color: var(--muted); line-height: 1.8; margin-top: 14px; }
   .note code { font-family: var(--font-mono); color: var(--gold); }
 
@@ -169,6 +176,8 @@
       <b>JUDGE</b><br>まだコメントを送っていません
     </div>
 
+    <div class="ebadge" id="engineBadge">…</div>
+
     <div class="blabel">リンク</div>
     <a class="hlink" href="index.html" target="_blank">順番待ち画面 ↗</a>
     <a class="hlink" href="#" id="adminLink" target="_blank">管理パネル ↗</a>
@@ -178,7 +187,7 @@
       並ぶキーワード <code id="nKw"></code><br>
       参加 <code id="nJoin"></code><br>
       退出 <code id="nLeave"></code><br><br>
-      ※管理パネルを開いている間だけコメントが処理されます。
+      ※このタブだけでも動作します（管理パネルを開いている場合はそちらが優先）。
     </div>
   </div>
 
@@ -219,9 +228,26 @@
     }
   };
 
-  /* ---- コメント送信チャンネル ---- */
-  let bc = null;
-  try { bc = new BroadcastChannel(CFG.storage.commentChannel); } catch (_) {}
+  /* ---- コメントバス＋エンジン起動 ----
+   * 管理パネルを開いていなくても、このタブがコメントを処理する。
+   * 管理パネル(priority 10)が開いていればそちらが優先される。 */
+  const { Engine, Leader, CommentBus, Store } = window.QueueCore;
+  Store.init();
+  Engine.start(5);
+
+  function updateEngineBadge() {
+    const el = document.getElementById('engineBadge');
+    if (!el) return;
+    if (Leader.isLeader) {
+      el.className = 'ebadge ok';
+      el.textContent = '● このタブがコメントを処理中';
+    } else {
+      el.className = 'ebadge';
+      el.textContent = '○ 別のタブ（管理パネル）が処理中';
+    }
+  }
+  setInterval(updateEngineBadge, 1000);
+  setTimeout(updateEngineBadge, 200);
 
   let count = 0;
 
@@ -248,8 +274,8 @@
     list.scrollTop = list.scrollHeight;
     document.getElementById('cCount').textContent = count + ' 件';
 
-    // 送信
-    if (bc) { try { bc.postMessage({ type: 'comment', text: rawText }); } catch (_) {} }
+    // 送信（自タブ＋他タブの両方へ）
+    CommentBus.post(rawText);
 
     // 判定結果の表示
     const label = {

@@ -16,19 +16,22 @@ window.APP_CONFIG = {
   /* ---------- 2. 配信コメントの取得方式 ---------- */
   comment: {
     /*  mode:
-     *   'test'     … テスト用ページ(test-comments.html)からコメントを受け取る（既定）
+     *   'bridge'   … REALITYのコメント画面からユーザースクリプト経由で受け取る（既定）
+     *                テストページ(test-comments.html)からのコメントも同時に受け取れます
      *   'fetch'    … url を定期的に fetch して HTML を解析（同一オリジン or CORS許可が必要）
      *   'iframe'   … url を iframe で読み込んで DOM を監視（同一オリジンが必要）
      *   'onecomme' … わんコメ等のローカル WebSocket から取得
      *
-     *  ※配信を始めるまで URL が分からないので、URL が判明したら
-     *    mode を 'fetch' か 'iframe' に変えて url とセレクタを埋めてください。
-     *    どのモードでも、この下の判定ロジック（予約！／参加／退出）は共通です。
+     *  REALITYのコメント画面は別ドメインのSPAなので 'fetch' / 'iframe' では読めません。
+     *  'bridge' ＋ reality-bridge.user.js（Tampermonkey）を使ってください。
      */
-    mode: 'test',
+    mode: 'bridge',
 
-    // ★ Config から指定する「特定のURL」
-    url: '',
+    // ★ Config から指定する「特定のURL」＝ REALITYのコメント表示画面
+    url: 'https://reality.app/comments/135107981.2195bf552090896d3cac9eea418d7bb158059854fea2a398fd75fc6baa5c1281',
+
+    // bridge モードでコメントの送信を受け付けるオリジン（これ以外からは受け取らない）
+    bridgeOrigins: ['https://reality.app'],
 
     pollIntervalMs: 1500,          // fetch モードの取得間隔(ms)
 
@@ -59,7 +62,13 @@ window.APP_CONFIG = {
     // {name} の部分がユーザー名として取り出されます（コメント1行目を判定）
     collabJoin:  '{name}さんがコラボ配信に参加',
     collabLeave: '{name}さんがコラボ配信を退出',
-    matchWholeLine: false  // true にすると1行目がテンプレートと完全一致した時だけ反応
+    matchWholeLine: false,  // true にすると1行目がテンプレートと完全一致した時だけ反応
+
+    /* ユーザー名が本文と別のフィールドで届く場合（REALITYのWebSocket等）に、
+     * 本文だけで参加／退出を判定するための文字列。
+     * システムメッセージと判定できた場合にのみ使われます。 */
+    collabJoinBody:  'コラボ配信に参加',
+    collabLeaveBody: 'コラボ配信を退出'
   },
 
   /* ---------- 5. 動作ルール ---------- */
