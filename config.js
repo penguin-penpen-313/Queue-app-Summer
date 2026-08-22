@@ -28,7 +28,7 @@ window.APP_CONFIG = {
     mode: 'bridge',
 
     // ★ Config から指定する「特定のURL」＝ REALITYのコメント表示画面
-    url: 'https://reality.app/comments/135107981.2195bf552090896d3cac9eea418d7bb158059854fea2a398fd75fc6baa5c1281',
+    url: 'https://reality.app/comments/135146292.3704227d25f66a8dcd7d222e99d1e165afd805150eb21bf8ff61969eff0662f0',
 
     // bridge モードでコメントの送信を受け付けるオリジン（これ以外からは受け取らない）
     bridgeOrigins: ['https://reality.app'],
@@ -51,8 +51,8 @@ window.APP_CONFIG = {
   /* ---------- 3. 列に並ぶためのキーワード ---------- */
   keywords: {
     // このいずれかがコメント本体に入力されたら、最後尾に追加
-    join: ['予約！', '予約!', 'join!', 'join！'],
-    matchMode:  'exact',   // 'exact'=本文がキーワードと完全一致 / 'includes'=含まれていればOK
+    join: ['w','予約！', '予約!', 'join!', 'join！'],
+    matchMode:  'includes',   // 'exact'=本文がキーワードと完全一致 / 'includes'=含まれていればOK
     ignoreCase: true,      // 大文字小文字を無視
     normalize:  true       // 全角/半角・前後空白のゆらぎを吸収
   },
@@ -60,15 +60,15 @@ window.APP_CONFIG = {
   /* ---------- 4. コラボ参加／退出のシステムメッセージ ---------- */
   systemMessage: {
     // {name} の部分がユーザー名として取り出されます（コメント1行目を判定）
-    collabJoin:  '{name}さんがコラボ配信に参加',
-    collabLeave: '{name}さんがコラボ配信を退出',
+    collabJoin:  '{name}さんが入室しました',
+    collabLeave: '{name}さんがいいねしたよ',
     matchWholeLine: false,  // true にすると1行目がテンプレートと完全一致した時だけ反応
 
     /* ユーザー名が本文と別のフィールドで届く場合（REALITYのWebSocket等）に、
      * 本文だけで参加／退出を判定するための文字列。
      * システムメッセージと判定できた場合にのみ使われます。 */
-    collabJoinBody:  'コラボ配信に参加',
-    collabLeaveBody: 'コラボ配信を退出'
+    collabJoinBody:  'さんが入室しました',
+    collabLeaveBody: 'さんがいいねしたよ'
   },
 
   /* ---------- 5. 動作ルール ---------- */
