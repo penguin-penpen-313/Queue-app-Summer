@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// =============================================================
+//  夏祭り順番待ちアプリ 用の Firestore セキュリティルール
+//
+//  プロジェクト: queue-summer（夏祭り専用）
+//  Firebaseコンソール → Firestore Database → 「ルール」タブに
+//  このファイルの中身を丸ごと貼り付けて「公開」。
+//
+//  ※ 先に Firestore Database を「本番環境モード」で作成しておくこと。
+//    （テストモードは30日で期限切れになり、あとで permission-denied の原因になる）
+//
+//  ---------------------------------------------------------------
+//  【うまくいかないとき】まずこれだけにして動作を確認する
+//
+//    match /matsuri-rooms/{room} {
+//      allow read, write: if true;
+//    }
+//
+//  これで動けば通信経路は正常。そのあと下の検証つきルールに戻す。
+//  ---------------------------------------------------------------
+// =============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- 順番待ちの部屋 ----
+    match /matsuri-rooms/{room} {
+
+      // 誰でも閲覧できる（観客が順番待ち画面を見るため）
+      allow read: if true;
+
+      // 書き込みは「想定した形のデータ」だけ許可する。
+      // 巨大なデータや無関係なフィールドを書き込む荒らしを防ぐ。
+      // delete は request.resource が無いため自動的に拒否される。
+      allow write: if
+           request.resource.data.keys()
+             .hasOnly(['queue', 'now', 'doneCount', 'log', 'fx', 'rev', 'updatedAt'])
+        && request.resource.data.get('queue', []).size() <= 200
+        && request.resource.data.get('now',   []).size() <= 10
+        && request.resource.data.get('log',   []).size() <= 60;
+
+      // ↓ 部屋をひとつに固定したい場合は、上の条件の先頭に足す
+      //    && room == 'summer-matsuri'
+    }
+  }
+}

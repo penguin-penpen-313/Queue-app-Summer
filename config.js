@@ -156,13 +156,31 @@ window.APP_CONFIG = {
     backend: 'firestore',
     roomId: 'summer-matsuri',        // 部屋の名前。変えると別の順番待ちになる
     collection: 'matsuri-rooms',     // Firestoreのコレクション名
+
+    /* ---------------------------------------------------------------
+     *  ▼ Firebase の設定（apiKey は「秘密鍵」ではありません）
+     *
+     *  FirebaseのWeb APIキーは、プロジェクトを識別するための公開IDです。
+     *  ブラウザで動く以上ソースに必ず含まれるもので、Googleも
+     *  「コードや設定ファイルに含めても安全」と明記しています。
+     *    https://firebase.google.com/docs/projects/api-keys
+     *
+     *  そのため GitHub の secret scanning が警告を出しますが、
+     *  これは想定内です（アラートは "Won't fix" で閉じて構いません）。
+     *
+     *  データを守っているのはキーの秘匿ではなく、次の2つです：
+     *    1. Firestore セキュリティルール … 同梱の firestore.rules を適用
+     *    2. APIキーの制限 … Google Cloud Console で
+     *       「ウェブサイトの制限」に自分のGitHub PagesのURLを設定
+     *  詳しくは FIREBASE-セキュリティ.md を参照。
+     * --------------------------------------------------------------- */
     firebaseConfig: {
-      apiKey: "AIzaSyAeNCee3BW4TvEs_OAr6HlK6aD7QOtGPiM",
-      authDomain: "queue-app-3af79.firebaseapp.com",
-      projectId: "queue-app-3af79",
-      storageBucket: "queue-app-3af79.firebasestorage.app",
-      messagingSenderId: "522447933389",
-      appId: "1:522447933389:web:b7ae12e97691863a99fe84"
+      apiKey: "AIzaSyAcF1T6fX-eboI3Tx3JKZJV6aLcWI-vtoc",
+      authDomain: "queue-summer.firebaseapp.com",
+      projectId: "queue-summer",
+      storageBucket: "queue-summer.firebasestorage.app",
+      messagingSenderId: "692851933544",
+      appId: "1:692851933544:web:6cfb37dc79c85e4ea6d6dd"
     }
   },
 

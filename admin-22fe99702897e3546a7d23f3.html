@@ -242,6 +242,12 @@
     </div>
 
     <div class="block">
+      <div class="blabel">同期の状態</div>
+      <button class="btn" id="btnSyncTest">🔍 同期をテスト</button>
+      <div class="hint" id="syncInfo"></div>
+    </div>
+
+    <div class="block">
       <div class="blabel">花火を打ち上げる</div>
       <input type="text" id="fwShells" placeholder="発数（例: 3000）" value="1000" inputmode="numeric">
       <button class="btn" id="btnFw">✧ 打ち上げる（全端末）</button>
@@ -499,6 +505,42 @@
                    : st === 'error' ? ('同期エラー ' + (detail || ''))
                    : '同期接続中…';
   }
+  function syncInfoText() {
+    const S = window.MatsuriSync || {};
+    const mk = v => v === true ? '✅' : v === false ? '❌' : '—';
+    let t = '保存先: <code>' + escapeHtml(S.path || '—') + '</code><br>'
+          + '読み取り ' + mk(S.readOk) + ' / 書き込み ' + mk(S.writeOk);
+    if (S.lastError) {
+      t += '<br><span style="color:var(--lantern)">' + escapeHtml(S.lastError.op) + ': '
+         + escapeHtml(S.lastError.code || S.lastError.message).slice(0, 120) + '</span>';
+    }
+    return t;
+  }
+  let testShownAt = 0;   // テスト結果は上書きせずしばらく残す
+  function refreshSyncInfo() {
+    if (Date.now() - testShownAt < 60000) return;
+    const el = document.getElementById('syncInfo');
+    if (el) el.innerHTML = syncInfoText();
+  }
+  setInterval(refreshSyncInfo, 1500);
+  refreshSyncInfo();
+
+  document.getElementById('btnSyncTest').onclick = async () => {
+    const el = document.getElementById('syncInfo');
+    const S = window.MatsuriSync || {};
+    if (!S.test) { el.innerHTML = 'このモードではテストできません（保存先: ' + escapeHtml(S.path || 'ローカル') + '）'; return; }
+    testShownAt = Date.now();
+    el.textContent = 'テスト中…';
+    const r = await S.test();
+    testShownAt = Date.now();
+    el.innerHTML =
+      '保存先: <code>' + escapeHtml(r.path) + '</code><br>' +
+      '読み取り: <b style="color:' + (/OK/.test(r.read) ? '#7dff9b' : 'var(--lantern)') + '">' + escapeHtml(r.read) + '</b><br>' +
+      '書き込み: <b style="color:' + (/OK/.test(r.write) ? '#7dff9b' : 'var(--lantern)') + '">' + escapeHtml(r.write) + '</b><br>' +
+      '<span style="color:var(--gold)">' + escapeHtml(r.hint) + '</span>';
+    console.log('[matsuri] 同期テスト', r);
+  };
+
   window.addEventListener('matsuri-sync', e => showSync(e.detail.status, e.detail.detail));
   if (window.MatsuriSync) showSync(window.MatsuriSync.status, window.MatsuriSync.detail);
   setTimeout(() => { if (window.MatsuriSync) showSync(window.MatsuriSync.status, window.MatsuriSync.detail); }, 1200);
