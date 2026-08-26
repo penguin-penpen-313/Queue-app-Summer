@@ -15,6 +15,8 @@
 | `config.js` | すべての設定（文言・キーワード・色・取得方式） | — |
 | `queue-core.js` | 状態管理・コメント解析・取得アダプタ | — |
 | `firebase-sync.js` | Firestore で他の端末と共有 | — |
+| `firestore.rules` | Firestoreのセキュリティルール（コンソールに貼る） | — |
+| `FIREBASE-セキュリティ.md` | APIキー警告への対応とキー制限の手順 | — |
 | `theme.js` / `theme.css` | 配色適用・花火エフェクト・共通スタイル | — |
 
 ## 使い方
@@ -38,7 +40,7 @@
 | 症状 | 確認 |
 |---|---|
 | コメントを送っても順番待ちに反映されない | テストページか管理パネルか順番待ち画面のいずれかを開いているか（どれか1つがコメント処理役になる） |
-| 他の端末に出ない | 画面上部のバッジが「同期中」になっているか。「同期エラー」ならFirestoreのルール未設定 |
+| 他の端末に出ない／permission-denied | 管理パネルの **「🔍 同期をテスト」** を押す。読み取り・書き込みのどちらが失敗しているか分かる。対処は `FIREBASE-セキュリティ.md` |
 | 同上 | テストページの JUDGE 欄が「列の最後尾に追加」になっているか。「何もしない」ならキーワード不一致 |
 | 同上 | ブラウザのサイトデータ（localStorage）がブロックされていないか。プライベートモードや厳格なトラッキング防止で動かない場合がある |
 | ファイルが読めない | `config.js` `queue-core.js` `theme.js` `theme.css` が同じフォルダにあるか（DevToolsのNetworkタブで404を確認） |
@@ -183,33 +185,40 @@ comment: {
 Firestore に保存する。順番待ち画面のURLを知っていれば、**別のPC・スマホ・
 別のブラウザからでも同じ順番待ちが見える**（リアルタイム更新）。
 
-既存の Firebase プロジェクト `queue-app-3af79` を流用する設定になっている。
-コレクション名は `matsuri-rooms`、ドキュメントは `sync.roomId`（既定 `summer-matsuri`）
-の1件だけなので、前のペンギン版ツールのデータとは干渉しない。
+Firebase プロジェクト **`queue-summer`**（夏祭り専用）を使う。
+コレクション名は `matsuri-rooms`、ドキュメントは `sync.roomId`（既定 `summer-matsuri`）の1件だけ。
+
+初回は Firebase 側の準備が必要：
+
+1. Firestore Database を **本番環境モード** で作成（テストモードは30日で切れる）
+2. 同梱の `firestore.rules` を「ルール」タブに丸ごと貼って公開
+3. 管理パネルの「🔍 同期をテスト」で読み書き両方OKを確認
+
+詳しくは `FIREBASE-セキュリティ.md`。
 
 ### Firestore のセキュリティルール（要設定）
 
-Firebaseコンソール → Firestore Database → ルール に、以下を **追記** する。
+同梱の **`firestore.rules`** を、Firebaseコンソール（プロジェクト `queue-summer`）→
+Firestore Database → 「ルール」タブに丸ごと貼り付けて公開する。
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+書き込めるのは `matsuri-rooms/summer-matsuri` の1件だけで、
+フィールドの種類と配列の長さも検証している。
+公開後は管理パネルの右上が「全端末と同期中」になるか必ず確認すること。
 
-    // ← 既存の queue コレクションのルールはそのまま残す
+### GitHubの「Google API Key」警告について
 
-    match /matsuri-rooms/{room} {
-      allow read: if true;
-      allow write: if true;
-    }
-  }
-}
-```
+`config.js` に含まれる `apiKey` は **Firebase の公開識別子** であり、秘密鍵ではない。
+ブラウザで動く以上ソースに必ず含まれるもので、Googleも
+[公式に「コードに含めても安全」と明記](https://firebase.google.com/docs/projects/api-keys)している。
+GitHubのアラートは `Won't fix` で閉じてよい。
 
-**注意**：`allow write: if true` は「誰でも書き込める」状態。
-`config.js` はページのソースを見れば読めるので、技術的な知識がある人なら
-順番待ちの中身を書き換えられる。イベント当日だけの利用なら実用上は問題ないが、
-気になる場合は Google ログインを必須にする方式に変更できる（要相談）。
+データを守るのはキーの秘匿ではなく、次の2つ：
+
+1. **Firestoreセキュリティルール**（上記 `firestore.rules`）
+2. **APIキーの制限** … Google Cloud Console で「ウェブサイトの制限」に
+   `https://penguin-penpen-313.github.io/*` を設定
+
+詳しい手順は **`FIREBASE-セキュリティ.md`**。
 
 ### このブラウザ内だけに戻したいとき
 
@@ -219,8 +228,19 @@ service cloud.firestore {
 ### 同期状態の見方
 
 - 順番待ち画面：上部に「同期中」の緑バッジ
-- 管理パネル：右上に「全端末と同期中」
-- 「同期エラー」が出る場合はルール未設定か、ネットワーク遮断を疑う
+- 管理パネル：右上に「全端末と同期中」、右パネルに「同期の状態」
+
+### permission-denied / 同期エラーが出たら
+
+管理パネルの **「🔍 同期をテスト」** を押す。読み取りと書き込みを別々に試し、
+どちらが失敗しているかと原因の見当を表示する。
+
+| 結果 | 原因 |
+|---|---|
+| 読み取りNG / 書き込みNG | ルールが効いていない。コレクション名かFirestore自体を確認 |
+| 読み取りOK / 書き込みNG | ルールの書き込み条件に合っていない |
+
+詳しい手順は `FIREBASE-セキュリティ.md`。
 
 ## config.js で変えられるもの
 
