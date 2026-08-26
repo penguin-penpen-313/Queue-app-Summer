@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>橋渡し動作確認</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .page { max-width: 900px; margin: 0 auto; padding: 28px 18px 80px; }
+  h1 { font-family: var(--font-disp); font-size: clamp(20px, 5vw, 30px); color: var(--gold); margin-bottom: 6px; }
+  .lead { color: var(--muted); font-size: 13px; line-height: 1.8; margin-bottom: 22px; }
+
+  .verdict {
+    border-radius: 14px; padding: 20px; margin-bottom: 22px;
+    border: 2px solid var(--border); background: rgba(0,0,0,.28);
+  }
+  .verdict.ok  { border-color: #7dff9b; background: rgba(125,255,155,.07); }
+  .verdict.ng  { border-color: var(--lantern); background: rgba(255,77,61,.08); }
+  .verdict .big { font-family: var(--font-disp); font-size: clamp(18px, 4.4vw, 26px); margin-bottom: 8px; }
+  .verdict.ok .big { color: #7dff9b; }
+  .verdict.ng .big { color: var(--lantern); }
+  .verdict .sub { font-size: 13px; line-height: 1.9; color: var(--text); }
+  .verdict code { font-family: var(--font-mono); color: var(--gold); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+  .box { background: rgba(21,26,61,.7); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .box h2 {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .box h2::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .btn {
+    width: 100%; padding: 11px; font-size: 13px; margin-bottom: 7px;
+    background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--border);
+  }
+  .btn:hover { border-color: var(--gold); color: var(--gold); }
+  .btn.p { background: linear-gradient(100deg, var(--gold), #ffab3d); color: #2a0d05; border: none; font-weight: 900; }
+  .btn.g { background: rgba(255,122,196,.12); color: var(--hanabi-a); border-color: rgba(255,122,196,.4); }
+  .btn.d { background: rgba(255,77,61,.1); color: var(--lantern); border-color: rgba(255,77,61,.3); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .row .btn { margin-bottom: 0; }
+
+  label.f { display:block; font-size: 11px; color: var(--muted); margin: 8px 0 4px; }
+
+  .state { font-family: var(--font-mono); font-size: 12px; line-height: 2; color: var(--muted); }
+  .state b { color: var(--text); }
+  .state .hl { color: var(--gold); }
+
+  .qlist { margin-top: 8px; }
+  .qrow {
+    display: flex; gap: 10px; align-items: center; padding: 8px 11px; margin-bottom: 5px;
+    border-radius: 8px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
+    font-size: 14px;
+  }
+  .qrow .n { font-family: var(--font-mono); color: var(--gold); width: 22px; text-align: center; }
+  .qrow.now { border-color: rgba(255,210,74,.5); background: rgba(255,210,74,.09); }
+
+  /* REALITY風のコメント欄（DOMモードの練習用） */
+  .chat {
+    height: 260px; overflow-y: auto; background: #000; border-radius: 10px; padding: 12px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  .chat-item { padding: 5px 0; flex-shrink: 0; }
+  .chat-item .cn { font-size: 12px; color: #9aa; }
+  .chat-item .cb { font-size: 15px; font-weight: 700; color: #fff; }
+  .chat-item.sys .cb { color: #ffd24a; font-size: 14px; }
+
+  .note { font-size: 12px; color: var(--muted); line-height: 1.9; margin-top: 12px; }
+  .note code { font-family: var(--font-mono); color: var(--gold); }
+  .hl2 { color: var(--hanabi-b); }
+</style>
+</head>
+<body>
+<div class="page wrap">
+
+  <h1>橋渡し 動作確認ページ</h1>
+  <div class="lead">
+    配信を始めなくても、ユーザースクリプトが正しく入っているかをここで確認できます。<br>
+    このページを開いた時点で、右下に金色の「順番待ち 橋渡し」パネルが出れば導入は成功です。
+  </div>
+
+  <div class="verdict" id="verdict">
+    <div class="big" id="vBig">確認中…</div>
+    <div class="sub" id="vSub"></div>
+  </div>
+
+  <div class="grid">
+
+    <div class="box">
+      <h2>1. コメントを流してみる</h2>
+      <label class="f">ユーザー名</label>
+      <input type="text" id="uname" value="ぺんぎん" maxlength="30">
+      <div style="height:8px"></div>
+      <button class="btn p" id="bJoin">「予約！」を送る（列に並ぶ）</button>
+      <div class="row" style="margin-bottom:7px">
+        <button class="btn" id="bIn">コラボ参加</button>
+        <button class="btn" id="bOut">コラボ退出</button>
+      </div>
+      <div class="row">
+        <div>
+          <label class="f">コイン数(C)</label>
+          <input type="text" id="gCoin" value="1000" inputmode="numeric">
+        </div>
+        <div>
+          <label class="f">個数(×)</label>
+          <input type="text" id="gCount" value="3" inputmode="numeric">
+        </div>
+      </div>
+      <div style="height:8px"></div>
+      <button class="btn g" id="bGift">ギフトを投げる（花火）</button>
+      <button class="btn" id="bChat">ふつうのコメントを送る</button>
+      <div class="note">
+        REALITYのWebSocketと同じ形のJSONを、スクリプトに直接流し込みます。<br>
+        本番と同じ経路（スクリプト → 順番待ちアプリ）を通ります。
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>2. 結果</h2>
+      <div class="state" id="st"></div>
+      <div class="qlist" id="ql"></div>
+      <div style="height:10px"></div>
+      <div class="row">
+        <button class="btn" onclick="window.open('index.html','_blank')">順番待ち画面 ↗</button>
+        <button class="btn d" id="bReset">全部消す</button>
+      </div>
+      <div class="note">
+        ここに反映されれば、コメント取得の仕組みは正常です。<br>
+        あとは本番のコメント画面で同じパネルが出れば動きます。
+      </div>
+    </div>
+
+  </div>
+
+  <div class="box" style="margin-top:16px">
+    <h2>3. DOMから拾う練習（通信で拾えないとき用）</h2>
+    <div class="note" style="margin:0 0 10px">
+      下はREALITYのコメント欄を模した表示です。パネルの「DOM」タブ →
+      「コメント欄の候補を探す」→ <code>div.chat-item</code> を選ぶと、
+      ここに追加された行が順番待ちに流れます。
+    </div>
+    <div class="chat" id="chat"></div>
+    <div style="height:8px"></div>
+    <div class="row">
+      <button class="btn" id="bDomJoin">DOMに「予約！」を追加</button>
+      <button class="btn" id="bDomIn">DOMに「コラボ参加」を追加</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="theme.js"></script>
+<script src="queue-core.js"></script>
+<script type="module" src="firebase-sync.js"></script>
+<script>
+(function () {
+  const CFG = window.APP_CONFIG;
+  const { Store, Engine, escapeHtml } = window.QueueCore;
+
+  Store.init();
+  Engine.start(5);
+
+  /* ---------- 導入チェック ---------- */
+  function checkInstall() {
+    const v = document.getElementById('verdict');
+    const big = document.getElementById('vBig');
+    const sub = document.getElementById('vSub');
+    const B = window.__matsuriBridge;
+
+    if (B) {
+      v.className = 'verdict ok';
+      big.textContent = '✅ ユーザースクリプトは動いています';
+      sub.innerHTML = 'バージョン <code>v' + escapeHtml(B.version) + '</code>　'
+        + '右下のパネルも出ているはずです。<br>'
+        + 'このまま下のボタンで、コメントが順番待ちに流れるか試してください。';
+    } else {
+      v.className = 'verdict ng';
+      big.textContent = '❌ ユーザースクリプトが動いていません';
+      sub.innerHTML =
+        '次の順に確認してください。<br>'
+        + '① Chromeに <code>Tampermonkey</code> を入れる（Chromeウェブストア）<br>'
+        + '② Tampermonkeyアイコン →「新規スクリプトを作成」→ 中身を全消し →'
+        + ' <code>reality-bridge.user.js</code> を貼り付け → <code>Ctrl+S</code><br>'
+        + '③ スクリプト一覧で「有効」になっているか確認<br>'
+        + '④ <b>このページを F5 で再読み込み</b><br>'
+        + '<span class="hl2">※スクリプトを入れ替えた場合、古い方は無効にしてください</span>';
+    }
+  }
+  setTimeout(checkInstall, 400);
+  setTimeout(checkInstall, 1800);
+
+  /* ---------- REALITY形式のJSONを流す ---------- */
+  const uname = document.getElementById('uname');
+  const nm = () => (uname.value || '').trim() || 'ぺんぎん';
+
+  function feed(obj) {
+    if (!window.__matsuriBridge) { alert('ユーザースクリプトが動いていません。上の案内を確認してください。'); return; }
+    window.__matsuriBridge.feed(obj);
+  }
+  const uid = () => 'u' + Math.random().toString(36).slice(2, 12) + '0000000000000000'.slice(0, 14);
+
+  document.getElementById('bJoin').onclick = () =>
+    feed({ media_id: 1, vlive_id: uid(), nickname: nm(), content: CFG.keywords.join[0], content_type: 1 });
+
+  document.getElementById('bChat').onclick = () =>
+    feed({ media_id: 1, vlive_id: uid(), nickname: nm(), content: 'こんばんは！', content_type: 1 });
+
+  document.getElementById('bIn').onclick = () =>
+    feed({ media_id: 1, vlive_id: '', nickname: '', content_type: 9,
+           content: CFG.systemMessage.collabJoin.replace('{name}', nm()) });
+
+  document.getElementById('bOut').onclick = () =>
+    feed({ media_id: 1, vlive_id: '', nickname: '', content_type: 9,
+           content: CFG.systemMessage.collabLeave.replace('{name}', nm()) });
+
+  document.getElementById('bGift').onclick = () => {
+    const c = Math.max(1, parseInt(document.getElementById('gCoin').value, 10) || 1);
+    const k = Math.max(1, parseInt(document.getElementById('gCount').value, 10) || 1);
+    const times = k > 1 ? '×' + k : '';
+    feed({ media_id: 1, vlive_id: uid(), nickname: nm(), content_type: 6,
+           content: nm() + ' ハイビスカスの花冠(' + c + 'C)' + times + 'をあげました' });
+  };
+
+  document.getElementById('bReset').onclick = () => {
+    if (confirm('順番待ちを全部消しますか？')) Store.clearAll();
+  };
+
+  /* ---------- DOM練習用 ---------- */
+  const chat = document.getElementById('chat');
+  function addChat(name, body, sys) {
+    const d = document.createElement('div');
+    d.className = 'chat-item' + (sys ? ' sys' : '');
+    d.innerHTML = '<div class="cn">' + escapeHtml(name) + '</div>'
+                + '<div class="cb">' + escapeHtml(body) + '</div>';
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+  }
+  addChat('もものすけ', 'こんばんは〜');
+  addChat('しろくま', 'たのしみ！');
+  addChat('あざらし', '888888');
+  document.getElementById('bDomJoin').onclick = () => addChat(nm(), CFG.keywords.join[0]);
+  document.getElementById('bDomIn').onclick  = () =>
+    addChat(CFG.systemMessage.collabJoin.replace('{name}', nm()), '', true);
+
+  /* ---------- 状態表示 ---------- */
+  function render(state) {
+    const B = window.__matsuriBridge;
+    if (!document.getElementById('st') || !document.getElementById('ql')) return;
+    document.getElementById('st').innerHTML =
+      'スクリプト：<b>' + (B ? 'v' + escapeHtml(B.version) : '未検出') + '</b><br>' +
+      '転送数：<b class="hl">' + (B ? B.stats.sent : 0) + '</b>　' +
+      '受信数：<b class="hl">' + (B ? B.stats.recv : 0) + '</b><br>' +
+      '出演中：<b>' + (state.now || []).length + '</b>人　' +
+      '順番待ち：<b>' + (state.queue || []).length + '</b>人' +
+      (state.fx ? '<br>直近の花火：<b class="hl">' + state.fx.shells.toLocaleString() + '発</b>' : '');
+
+    const rows = [];
+    (state.now || []).forEach(p => rows.push('<div class="qrow now"><span class="n">▶</span>'
+      + escapeHtml(p.name) + '<span style="margin-left:auto;font-size:11px;color:var(--gold)">NOW</span></div>'));
+    (state.queue || []).forEach((p, i) => rows.push('<div class="qrow"><span class="n">' + (i + 1) + '</span>'
+      + escapeHtml(p.name) + '</div>'));
+    document.getElementById('ql').innerHTML = rows.join('') ||
+      '<div style="color:var(--muted);font-size:13px;padding:8px 2px">まだ誰もいません</div>';
+  }
+  Store.onChange(render);
+  render(Store.state);
+  setInterval(() => render(Store.state), 1000);
+})();
+</script>
+</body>
+</html>

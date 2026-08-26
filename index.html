@@ -63,6 +63,51 @@
     white-space: nowrap;
   }
   .pill.live { color: var(--hanabi-b); background: rgba(92,225,230,0.08); border-color: rgba(92,225,230,0.3); }
+  .pill.sync { font-size: 11px; }
+  .pill.sync.ok   { color: #7dff9b; background: rgba(125,255,155,0.07); border-color: rgba(125,255,155,0.28); }
+  .pill.sync.bad  { color: var(--lantern); background: rgba(255,77,61,0.08); border-color: rgba(255,77,61,0.35); }
+
+  /* ===== 花火カウンター ===== */
+  .fw-counter {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    z-index: 3;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s, transform .4s cubic-bezier(.2,1.4,.5,1);
+  }
+  .fw-counter.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .fw-counter .who {
+    font-size: clamp(13px, 3.4vw, 18px);
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 0 18px rgba(255,210,74,.7);
+    margin-bottom: 4px;
+  }
+  .fw-counter .num {
+    font-family: var(--font-disp);
+    font-size: clamp(40px, 11vw, 92px);
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255,210,74,.9), 0 0 80px rgba(255,77,61,.6);
+  }
+  .fw-counter .num small { font-size: 0.4em; margin-left: 4px; color: var(--gold); }
+  .fw-counter .bar {
+    margin: 12px auto 0;
+    width: min(60vw, 300px);
+    height: 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.14);
+    overflow: hidden;
+  }
+  .fw-counter .bar i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--gold), var(--lantern));
+    transition: width .3s linear;
+  }
 
   .dot {
     display: inline-block;
@@ -323,6 +368,12 @@
 <canvas id="fireworks"></canvas>
 <div class="lantern-row" id="lanterns"></div>
 
+<div class="fw-counter" id="fwCounter">
+  <div class="who" id="fwWho"></div>
+  <div class="num"><span id="fwNum">0</span><small>発</small></div>
+  <div class="bar"><i id="fwBar"></i></div>
+</div>
+
 <div class="page wrap">
 
   <div class="head">
@@ -332,6 +383,7 @@
     <div class="meta">
       <span class="pill" id="countPill">—</span>
       <span class="pill live"><span class="dot"></span><span id="clock">--:--</span></span>
+      <span class="pill sync" id="syncPill" style="display:none">—</span>
     </div>
   </div>
 
@@ -365,6 +417,7 @@
 <script src="config.js"></script>
 <script src="theme.js"></script>
 <script src="queue-core.js"></script>
+<script type="module" src="firebase-sync.js"></script>
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
@@ -396,8 +449,38 @@
     lr.appendChild(d);
   }
 
-  /* --- 花火 --- */
+  /* --- 花火（ギフト連動） --- */
   const fw = window.Fireworks(document.getElementById('fireworks'));
+
+  const fwBox = document.getElementById('fwCounter');
+  const fwNum = document.getElementById('fwNum');
+  const fwBar = document.getElementById('fwBar');
+  const fwWho = document.getElementById('fwWho');
+  let hideTimer = null;
+
+  fw.onProgress((p) => {
+    if (!CFG.fireworks.showCounter) return;
+    if (p.running) {
+      clearTimeout(hideTimer);
+      fwBox.classList.add('on');
+      fwNum.textContent = p.total.toLocaleString();
+      fwBar.style.width = Math.round((p.fired / p.total) * 100) + '%';
+    } else {
+      fwBar.style.width = '100%';
+      hideTimer = setTimeout(() => { fwBox.classList.remove('on'); fwBar.style.width = '0%'; }, 1400);
+    }
+  });
+
+  /* --- 同期状態の表示 --- */
+  const syncPill = document.getElementById('syncPill');
+  function showSync(st, detail) {
+    if (st === 'off') { syncPill.style.display = 'none'; return; }
+    syncPill.style.display = '';
+    syncPill.className = 'pill sync ' + (st === 'ok' ? 'ok' : st === 'error' ? 'bad' : '');
+    syncPill.textContent = st === 'ok' ? '同期中' : st === 'error' ? ('同期エラー: ' + (detail || '')) : '接続中…';
+  }
+  window.addEventListener('matsuri-sync', (e) => showSync(e.detail.status, e.detail.detail));
+  if (window.MatsuriSync) showSync(window.MatsuriSync.status, window.MatsuriSync.detail);
 
   /* --- 時計 --- */
   function clock() {
@@ -410,10 +493,30 @@
   /* --- 描画 --- */
   const hon = CFG.app.honorific ? '<span class="hon">' + escapeHtml(CFG.app.honorific) + '</span>' : '';
   let prevNowKeys = '';
+  let lastFxId = null;
+  let fxInitialized = false;
 
-  function render(state) {
+  function render(state, origin) {
     const now = state.now || [];
     const queue = state.queue || [];
+
+    /* --- ギフト → 花火 ---
+     * ページを開いた時点の分と、サーバーから最初に読み込んだ分は打ち上げない
+     * （途中から開いた端末で過去の花火が再生されるのを防ぐ） */
+    const fx = state.fx;
+    if (!fxInitialized || origin === 'remote-init') {
+      fxInitialized = true;
+      lastFxId = fx ? fx.id : null;
+    } else if (fx && fx.id !== lastFxId) {
+      lastFxId = fx.id;
+      // 5分以上前のイベントは無視（他端末の古いデータ対策）
+      if (!fx.at || Date.now() - fx.at < 300000) {
+        fw.gift(fx.shells);
+        fwWho.textContent = fx.name
+          ? fx.name + (CFG.app.honorific || '') + ' からのギフト'
+          : 'ギフト';
+      }
+    }
 
     document.body.classList.toggle('has-now', now.length > 0);
 

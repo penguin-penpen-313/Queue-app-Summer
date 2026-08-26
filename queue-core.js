@@ -93,6 +93,26 @@
     return n + '\n' + c;
   }
 
+  /* ---- ギフト判定 ----
+   * 「ハイビスカスの花冠(1000C)×3をあげました」→ { coins:1000, count:3, shells:3000 }
+   * 「ハイビスカスの花冠(1000C)をあげました」  → { coins:1000, count:1, shells:1000 }
+   */
+  let RE_GIFT = null;
+  try { RE_GIFT = new RegExp(CFG.gift.pattern); } catch (e) { console.error('gift.pattern が不正:', e); }
+
+  function parseGift(text) {
+    if (!CFG.gift || !CFG.gift.enabled || !RE_GIFT) return null;
+    const m = normalize(text).match(RE_GIFT);
+    if (!m) return null;
+    const coins = parseInt(String(m[1]).replace(/,/g, ''), 10);
+    const count = m[2] ? parseInt(m[2], 10) : 1;
+    if (!isFinite(coins) || coins <= 0 || !isFinite(count) || count <= 0) return null;
+    const raw = coins * count;
+    const shells = Math.max(CFG.gift.minShells || 1,
+                   Math.min(CFG.gift.maxShells || 10000, raw));
+    return { coins, count, rawShells: raw, shells };
+  }
+
   function interpret(rawText) {
     const lines = String(rawText || '').replace(/\r/g, '').split('\n');
     const firstLine = (lines[0] || '').trim();
@@ -103,6 +123,10 @@
 
     const mJoin = firstLine.match(RE_JOIN_SYS);
     if (mJoin) return { type: 'collab-join', name: cleanName(mJoin[1]), body: firstLine };
+
+    // ギフトは1行目・本文のどちらに入っていても拾う
+    const gift = parseGift(body) || parseGift(firstLine);
+    if (gift) return { type: 'gift', name: cleanName(firstLine), body: body || firstLine, gift };
 
     if (isJoinKeyword(body)) return { type: 'join', name: cleanName(firstLine), body };
 
@@ -115,12 +139,14 @@
   const CH  = CFG.storage.queueChannel;
 
   function emptyState() {
-    return { queue: [], now: [], doneCount: 0, log: [], processed: [], updatedAt: 0, rev: 0 };
+    return { queue: [], now: [], doneCount: 0, log: [], processed: [], fx: null, updatedAt: 0, rev: 0 };
   }
 
   const Store = {
     _listeners: [],
     _bc: null,
+    _remote: null,
+    _remoteFirst: true,
     state: emptyState(),
 
     init() {
@@ -168,7 +194,40 @@
       this.state.rev = (this.state.rev || 0) + 1;
       try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch (_) {}
       if (this._bc) { try { this._bc.postMessage({ type: 'state', state: this.state }); } catch (_) {} }
+      if (this._remote) { try { this._remote.write(this.state); } catch (e) { console.error(e); } }
       this._emit(origin || 'local');
+    },
+
+    /* ---- サーバー同期（Firestore等）の接続 ----
+     * remote = { write(state), onRemote(cb) }
+     * 他の端末からも同じ順番待ちが見えるようになります。 */
+    attachRemote(remote) {
+      this._remote = remote;
+      remote.onRemote((s) => {
+        if (!s) {
+          // サーバーにまだ何も無い＝手元の内容を初期値として送る
+          if (this._remoteFirst && (this.state.queue.length || this.state.now.length)) {
+            this._remoteFirst = false;
+            this.save('seed');
+          }
+          this._remoteFirst = false;
+          return;
+        }
+        const incoming = Object.assign(emptyState(), s);
+        // 最初の1回はサーバーを正とする。以降は新しい版だけ採用
+        if (this._remoteFirst || (incoming.rev || 0) > (this.state.rev || 0)
+            || (incoming.updatedAt || 0) > (this.state.updatedAt || 0)) {
+          const first = this._remoteFirst;
+          this._remoteFirst = false;
+          this.state = incoming;
+          try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch (_) {}
+          // 初回の受信は「今の状態を読み込んだだけ」なので、
+          // 途中から開いた端末で過去の花火が再生されないよう区別する
+          this._emit(first ? 'remote-init' : 'remote');
+        }
+      });
+      // 手元にデータがあり、サーバーが空だった場合に備えて少し待ってから送る
+      return this;
     },
 
     onChange(fn) { this._listeners.push(fn); return this; },
@@ -275,6 +334,24 @@
       }
       this.save();
       return { ok: false, reason: 'not-found' };
+    },
+
+    /* ---- ギフト＝花火の打ち上げ指示（全端末に伝わる） ---- */
+    gift(g, fromName) {
+      this._fresh();
+      const shells = Math.max(1, Math.round(g && g.shells ? g.shells : g));
+      this.state.fx = {
+        id: uid(),
+        kind: 'gift',
+        shells: shells,
+        coins: g && g.coins || 0,
+        count: g && g.count || 1,
+        name: cleanName(fromName || ''),
+        at: Date.now()
+      };
+      this.log(`${fromName ? '「' + cleanName(fromName) + '」の' : ''}ギフト → 花火 ${shells}発`);
+      this.save();
+      return { ok: true, shells };
     },
 
     removeAt(i)    { this._fresh(); const e = this.state.queue.splice(i, 1)[0]; if (e) { this.log(`「${e.name}」を削除`); this.save(); } },
@@ -385,7 +462,8 @@
       global.addEventListener('message', (e) => {
         const d = e.data;
         if (!d || d.__matsuri !== 1) return;
-        if (allow.indexOf(e.origin) < 0) return;   // 許可オリジン以外は無視
+        // 許可オリジン、または自分自身のページ（動作確認ページ）からのみ受け付ける
+        if (allow.indexOf(e.origin) < 0 && e.origin !== global.location.origin) return;
 
         this.bridgeConnected = true;
         this.bridgeLastAt = Date.now();
@@ -572,6 +650,7 @@
         if (r.type === 'join')              result = Store.enqueue(r.name, { via: 'comment' });
         else if (r.type === 'collab-join')  result = Store.collabJoin(r.name);
         else if (r.type === 'collab-leave') result = Store.collabLeave(r.name);
+        else if (r.type === 'gift')         result = Store.gift(r.gift, r.name);
         else Store.save();                     // processed の記録を確定
         if (onEvent) onEvent(r, result, raw);
       });
@@ -584,10 +663,23 @@
     stop() { CommentSource.stop(); this.running = false; }
   };
 
+  /* ============ 同期状態の初期化 ============
+   * firebase-sync.js（module）が何らかの理由で読み込めない場合でも、
+   * 画面に「同期できていない」と分かるようにしておく。 */
+  if (CFG.sync && CFG.sync.backend === 'firestore') {
+    if (!global.MatsuriSync) global.MatsuriSync = { status: 'connecting', detail: '' };
+    setTimeout(() => {
+      if (global.MatsuriSync && global.MatsuriSync.status === 'connecting') {
+        global.MatsuriSync = { status: 'error', detail: 'Firebaseに接続できません' };
+        global.dispatchEvent(new CustomEvent('matsuri-sync', { detail: global.MatsuriSync }));
+      }
+    }, 12000);
+  }
+
   /* ============ 公開 ============ */
   global.QueueCore = {
     Store, CommentSource, CommentBus, Engine, Leader,
-    interpret, composeRaw, normalize, keyOf, escapeHtml, cleanName, isJoinKeyword, uid,
+    interpret, composeRaw, parseGift, normalize, keyOf, escapeHtml, cleanName, isJoinKeyword, uid,
     TAB_ID
   };
 

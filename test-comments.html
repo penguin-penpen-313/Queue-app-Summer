@@ -68,6 +68,26 @@
   .verdict b { color: var(--gold); font-family: var(--font-mono); font-size: 11px; }
   .verdict .n { color: var(--text); font-weight: 700; }
 
+  .btn.gift {
+    background: linear-gradient(100deg, rgba(255,122,196,.18), rgba(177,140,255,.18));
+    color: var(--hanabi-a); border-color: rgba(255,122,196,.4);
+  }
+  .btn.gift:hover { background: linear-gradient(100deg, rgba(255,122,196,.32), rgba(177,140,255,.32)); color: #fff; }
+
+  .minilabel { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+  input[type="number"] {
+    width: 100%; background: rgba(8,11,32,.85); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: var(--font-mono);
+    font-size: 14px; padding: 9px 10px; outline: none;
+  }
+  input[type="number"]:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,210,74,.16); }
+
+  .giftinfo {
+    font-family: var(--font-mono); font-size: 12px; color: var(--hanabi-a);
+    background: rgba(255,122,196,.07); border: 1px solid rgba(255,122,196,.22);
+    border-radius: 8px; padding: 7px 10px; text-align: center; margin-bottom: 6px;
+  }
+
   .ebadge {
     margin-top: 10px; padding: 9px 12px; border-radius: 9px;
     font-family: var(--font-mono); font-size: 11px; text-align: center;
@@ -141,6 +161,8 @@
   .comment-item.sys .cname { color: var(--gold); }
   .comment-item.sys .cbody { display: none; }
   .comment-item.kw { border-left-color: var(--lantern); background: rgba(255,77,61,.07); }
+  .comment-item.gift { border-left-color: var(--hanabi-a); background: rgba(255,122,196,.09); }
+  .comment-item.gift .cname { color: var(--hanabi-a); }
 
   .stream-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; }
 </style>
@@ -171,6 +193,22 @@
       <button class="btn join"  id="btnJoin">コラボ参加</button>
       <button class="btn leave" id="btnLeave">コラボ退出</button>
     </div>
+
+    <div class="blabel">ギフト（花火）</div>
+    <input type="text" id="giftName" placeholder="ギフト名" value="ハイビスカスの花冠" maxlength="30">
+    <div class="row2" style="margin-bottom:6px">
+      <div>
+        <div class="minilabel">コイン数 (C)</div>
+        <input type="number" id="giftCoin" value="1000" min="1" max="1000000" step="1">
+      </div>
+      <div>
+        <div class="minilabel">個数 (×)</div>
+        <input type="number" id="giftCount" value="3" min="1" max="10000" step="1">
+      </div>
+    </div>
+    <div class="giftinfo" id="giftInfo">→ 花火 3,000発</div>
+    <div class="chips" id="giftChips"></div>
+    <button class="btn gift" id="btnGift">ギフトを投げる</button>
 
     <div class="verdict" id="verdict">
       <b>JUDGE</b><br>まだコメントを送っていません
@@ -207,6 +245,7 @@
 <script src="config.js"></script>
 <script src="theme.js"></script>
 <script src="queue-core.js"></script>
+<script type="module" src="firebase-sync.js"></script>
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
@@ -265,6 +304,7 @@
     const div = document.createElement('div');
     div.className = 'comment-item' +
       (r.type === 'collab-join' || r.type === 'collab-leave' ? ' sys' :
+       r.type === 'gift' ? ' gift' :
        r.type === 'join' ? ' kw' : '');
     div.dataset.id = 'c' + (++count);
     div.innerHTML =
@@ -282,11 +322,16 @@
       'join':         '列の最後尾に追加',
       'collab-join':  'コラボ参加 → NOW に表示',
       'collab-leave': 'コラボ退出 → NOW から外す',
+      'gift':         'ギフト → 花火を打ち上げ',
       'none':         '何もしない（通常コメント）'
     }[r.type];
     document.getElementById('verdict').innerHTML =
       '<b>JUDGE</b><br>種別：<span class="n">' + escapeHtml(label) + '</span><br>' +
-      '対象：<span class="n">' + escapeHtml(r.name || '—') + '</span>';
+      '対象：<span class="n">' + escapeHtml(r.name || '—') + '</span>' +
+      (r.type === 'gift'
+        ? '<br>花火：<span class="n">' + r.gift.coins.toLocaleString() + 'C × ' + r.gift.count
+          + ' = ' + r.gift.shells.toLocaleString() + '発</span>'
+        : '');
   }
 
   /* ---- ボタン ---- */
@@ -315,6 +360,47 @@
     const n = nameOrAlert(); if (!n) return;
     push(CFG.systemMessage.collabLeave.replace('{name}', n));
   };
+
+  /* ---- ギフト ---- */
+  const gName  = document.getElementById('giftName');
+  const gCoin  = document.getElementById('giftCoin');
+  const gCount = document.getElementById('giftCount');
+  const gInfo  = document.getElementById('giftInfo');
+
+  function giftBody(user) {
+    const coins = Math.max(1, parseInt(gCoin.value, 10) || 1);
+    const count = Math.max(1, parseInt(gCount.value, 10) || 1);
+    const item  = (gName.value || 'ギフト').trim();
+    // 個数が1のときは「×1」を付けない（REALITYの表記に合わせる）
+    const times = count > 1 ? '×' + count : '';
+    return { text: `${user} ${item}(${coins}C)${times}をあげました`, coins, count };
+  }
+
+  function updateGiftInfo() {
+    const coins = Math.max(1, parseInt(gCoin.value, 10) || 1);
+    const count = Math.max(1, parseInt(gCount.value, 10) || 1);
+    const raw   = coins * count;
+    const cap   = CFG.gift.maxShells || 10000;
+    gInfo.textContent = '→ 花火 ' + Math.min(raw, cap).toLocaleString() + '発'
+      + (raw > cap ? `（${raw.toLocaleString()}発 → 上限${cap.toLocaleString()}発）` : '');
+  }
+  [gCoin, gCount].forEach(el => el.addEventListener('input', updateGiftInfo));
+  updateGiftInfo();
+
+  document.getElementById('btnGift').onclick = () => {
+    const n = nameOrAlert(); if (!n) return;
+    push(n + '\n' + giftBody(n).text);
+  };
+
+  // よく使う組み合わせ
+  const gChips = document.getElementById('giftChips');
+  [[10, 1], [100, 1], [1000, 3], [500, 20], [1000, 10]].forEach(([c, k]) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = `${c}C×${k}`;
+    b.onclick = () => { gCoin.value = c; gCount.value = k; updateGiftInfo(); };
+    gChips.appendChild(b);
+  });
 
   ubody.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) document.getElementById('btnSend').click();

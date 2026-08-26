@@ -28,7 +28,7 @@ window.APP_CONFIG = {
     mode: 'bridge',
 
     // ★ Config から指定する「特定のURL」＝ REALITYのコメント表示画面
-    url: 'https://reality.app/comments/135146292.3704227d25f66a8dcd7d222e99d1e165afd805150eb21bf8ff61969eff0662f0',
+    url: 'https://reality.app/comments/135107981.2195bf552090896d3cac9eea418d7bb158059854fea2a398fd75fc6baa5c1281',
 
     // bridge モードでコメントの送信を受け付けるオリジン（これ以外からは受け取らない）
     bridgeOrigins: ['https://reality.app'],
@@ -51,8 +51,8 @@ window.APP_CONFIG = {
   /* ---------- 3. 列に並ぶためのキーワード ---------- */
   keywords: {
     // このいずれかがコメント本体に入力されたら、最後尾に追加
-    join: ['w','予約！', '予約!', 'join!', 'join！'],
-    matchMode:  'includes',   // 'exact'=本文がキーワードと完全一致 / 'includes'=含まれていればOK
+    join: ['予約！', '予約!', 'join!', 'join！'],
+    matchMode:  'exact',   // 'exact'=本文がキーワードと完全一致 / 'includes'=含まれていればOK
     ignoreCase: true,      // 大文字小文字を無視
     normalize:  true       // 全角/半角・前後空白のゆらぎを吸収
   },
@@ -60,15 +60,29 @@ window.APP_CONFIG = {
   /* ---------- 4. コラボ参加／退出のシステムメッセージ ---------- */
   systemMessage: {
     // {name} の部分がユーザー名として取り出されます（コメント1行目を判定）
-    collabJoin:  '{name}さんが入室しました',
-    collabLeave: '{name}さんがいいねしたよ',
+    collabJoin:  '{name}さんがコラボ配信に参加しました',
+    collabLeave: '{name}さんがコラボ配信を退出しました',
     matchWholeLine: false,  // true にすると1行目がテンプレートと完全一致した時だけ反応
 
     /* ユーザー名が本文と別のフィールドで届く場合（REALITYのWebSocket等）に、
      * 本文だけで参加／退出を判定するための文字列。
      * システムメッセージと判定できた場合にのみ使われます。 */
-    collabJoinBody:  'さんが入室しました',
-    collabLeaveBody: 'さんがいいねしたよ'
+    collabJoinBody:  'コラボ配信に参加',
+    collabLeaveBody: 'コラボ配信を退出'
+  },
+
+  /* ---------- 4-b. ギフト（花火の打ち上げ数を決める） ----------
+   * REALITY のギフトメッセージ例：
+   *   ハイビスカスの花冠(1000C)×3をあげました   → 1000 × 3 = 3000発
+   *   ハイビスカスの花冠(1000C)をあげました      → 1000 × 1 = 1000発
+   */
+  gift: {
+    enabled: true,
+    // コメント本文から「コイン数」と「個数」を取り出す正規表現
+    //   グループ1 = コイン数 / グループ2 = 個数（省略時は1）
+    pattern: '\\((\\d[\\d,]*)\\s*C\\)\\s*(?:[×xX*]\\s*(\\d+))?\\s*を?\\s*あげました',
+    maxShells: 10000,   // 派手さの上限になる発数（これ以上は同じ演出）
+    minShells: 1        // 最低発数
   },
 
   /* ---------- 5. 動作ルール ---------- */
@@ -117,11 +131,42 @@ window.APP_CONFIG = {
   /* ---------- 8. 花火エフェクト ---------- */
   fireworks: {
     enabled: true,
-    ambientIntervalMs: 2600,  // 通常時に花火が上がる間隔
-    celebrateBurst: 6         // 呼び出し時に一気に上げる花火の数
+    ambientIntervalMs: 0,     // 0 = 通常時は打ち上げない（ギフトの時だけ）
+    celebrateBurst: 0,        // 0 = NOW が切り替わっても打ち上げない
+
+    /* 打ち上げ発数に応じた演出。1発〜gift.maxShells発の間で滑らかに変化します。
+     * 発数が多いほど「同時に上がる数が増え・間隔が詰まり・長く続く」＝派手になります。 */
+    maxGapMs:      900,       // 発射間隔（1発だけのとき）— 発数が増えるほど短くなる
+    minGapMs:      70,        // 発射間隔の下限（最大発数のとき）
+    minSimul:      1,         // 同時に上がる玉の数（1発のとき）
+    maxSimul:      10,        // 同時に上がる玉の数（最大発数のとき）
+    simulCurve:    1.6,       // 同時数の増え方（大きいほど、後半で一気に増える）
+    maxDurationMs: 60000,     // 打ち上げの最長時間（超えるなら同時数を自動で増やす）
+    maxParticles:  2600,      // 描画負荷の上限（超えそうなら1発あたりの粒を減らす）
+    bigShellEvery: 12,        // 何発かに1回、大玉を混ぜる
+    showCounter:   true       // 打ち上げ中に「◯◯発」を表示
   },
 
-  /* ---------- 9. 内部設定（通常変更不要） ---------- */
+  /* ---------- 9. 他の端末と共有する設定（Firestore） ----------
+   * backend:
+   *   'local'     … このブラウザ内だけで同期（サーバー不要）
+   *   'firestore' … Firestoreで同期。別のPC・スマホからも順番待ち画面が見える
+   */
+  sync: {
+    backend: 'firestore',
+    roomId: 'summer-matsuri',        // 部屋の名前。変えると別の順番待ちになる
+    collection: 'matsuri-rooms',     // Firestoreのコレクション名
+    firebaseConfig: {
+      apiKey: "AIzaSyAeNCee3BW4TvEs_OAr6HlK6aD7QOtGPiM",
+      authDomain: "queue-app-3af79.firebaseapp.com",
+      projectId: "queue-app-3af79",
+      storageBucket: "queue-app-3af79.firebasestorage.app",
+      messagingSenderId: "522447933389",
+      appId: "1:522447933389:web:b7ae12e97691863a99fe84"
+    }
+  },
+
+  /* ---------- 10. 内部設定（通常変更不要） ---------- */
   storage: {
     stateKey:       'matsuri-queue-state-v1',
     queueChannel:   'matsuri-queue',
