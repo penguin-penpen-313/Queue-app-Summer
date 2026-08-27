@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260826a">
+<link rel="stylesheet" href="theme.css">
 <style>
   body { min-height: 100vh; }
 
@@ -271,10 +271,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20260826a"></script>
-<script src="theme.js?v=20260826a"></script>
-<script src="queue-core.js?v=20260826a"></script>
-<script type="module" src="firebase-sync.js?v=20260826a"></script>
+<script src="config.js"></script>
+<script src="theme.js"></script>
+<script src="queue-core.js"></script>
+<script type="module" src="firebase-sync.js"></script>
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
@@ -508,10 +508,7 @@
   function syncInfoText() {
     const S = window.MatsuriSync || {};
     const mk = v => v === true ? '✅' : v === false ? '❌' : '—';
-    const pid = (CFG.sync && CFG.sync.firebaseConfig && CFG.sync.firebaseConfig.projectId) || '—';
-    let t = 'ver <code>' + escapeHtml(CFG.appVersion || '?') + '</code>'
-          + ' / project <code>' + escapeHtml(pid) + '</code><br>'
-          + '保存先: <code>' + escapeHtml(S.path || '—') + '</code><br>'
+    let t = '保存先: <code>' + escapeHtml(S.path || '—') + '</code><br>'
           + '読み取り ' + mk(S.readOk) + ' / 書き込み ' + mk(S.writeOk);
     if (S.lastError) {
       t += '<br><span style="color:var(--lantern)">' + escapeHtml(S.lastError.op) + ': '
@@ -536,10 +533,7 @@
     el.textContent = 'テスト中…';
     const r = await S.test();
     testShownAt = Date.now();
-    const pid2 = (CFG.sync && CFG.sync.firebaseConfig && CFG.sync.firebaseConfig.projectId) || '—';
     el.innerHTML =
-      'ver <code>' + escapeHtml(CFG.appVersion || '?') + '</code>' +
-      ' / project <code>' + escapeHtml(pid2) + '</code><br>' +
       '保存先: <code>' + escapeHtml(r.path) + '</code><br>' +
       '読み取り: <b style="color:' + (/OK/.test(r.read) ? '#7dff9b' : 'var(--lantern)') + '">' + escapeHtml(r.read) + '</b><br>' +
       '書き込み: <b style="color:' + (/OK/.test(r.write) ? '#7dff9b' : 'var(--lantern)') + '">' + escapeHtml(r.write) + '</b><br>' +
