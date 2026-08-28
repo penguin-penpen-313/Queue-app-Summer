@@ -314,6 +314,7 @@
   Engine.start(5);
 
   /* ================= 1. 橋渡しの導入判定 ================= */
+  const EXPECTED_BRIDGE = '1.4.1';   // 同梱の reality-bridge.user.js の版
   let bridgeSeen = false;
 
   function checkInstall() {
@@ -324,25 +325,39 @@
 
     if (B) {
       bridgeSeen = true;
+      const old = String(B.version) !== EXPECTED_BRIDGE;
       v.className = 'verdict ok';
-      big.textContent = '✅ 橋渡しスクリプトは動いています';
+      big.textContent = old ? '⚠ 動いていますが、古い版です' : '✅ 橋渡しスクリプトは動いています';
       sub.innerHTML =
-        'スクリプト <code>v' + escapeHtml(B.version) + '</code>　' +
+        'スクリプト <code>v' + escapeHtml(B.version) + '</code>' +
+        (old ? '（同梱は <code>v' + EXPECTED_BRIDGE + '</code>）' : '') + '　' +
         'アプリ <code>' + escapeHtml(CFG.appVersion || '?') + '</code>　' +
         'project <code>' + escapeHtml((CFG.sync && CFG.sync.firebaseConfig && CFG.sync.firebaseConfig.projectId) || '—') + '</code><br>' +
-        '下の「送信の経路：橋渡し経由」で、本番とまったく同じ道すじの確認ができます。';
+        (old
+          ? '<span class="hl2">reality-bridge.user.js を貼り替えてください。</span>下のテストは動きます。'
+          : '下の「送信の経路：橋渡し経由」で、本番とまったく同じ道すじの確認ができます。');
     } else {
       v.className = 'verdict ng';
       big.textContent = '❌ 橋渡しスクリプトが動いていません';
       sub.innerHTML =
         'スクリプト無しでも下のテストは動きますが、<b>本番のコメントは拾えません</b>。<br>' +
-        '<details open><summary>入れかたを見る</summary>' +
+        '<b class="hl2">REALITYでは動くのにここで出ない場合は、入れてあるスクリプトが古い版です。</b>' +
+        'v1.3.0以前はこのページ（test.html）を対象に含んでいないため起動しません。' +
+        '<code>reality-bridge.user.js</code> を最新（v' + EXPECTED_BRIDGE + '）に貼り替えてください。' +
+        '<details open><summary>貼り替えかた</summary>' +
+        '① Tampermonkeyアイコン →「ダッシュボード」→ 一覧から' +
+        ' <b>夏祭り順番待ち — REALITYコメント橋渡し</b> を開く<br>' +
+        '② エディタで <code>Ctrl+A</code> → <code>Delete</code> で全部消す<br>' +
+        '③ 新しい <code>reality-bridge.user.js</code> を全部貼り付け → <code>Ctrl+S</code><br>' +
+        '④ 1行目付近の <code>@version</code> が <code>' + EXPECTED_BRIDGE + '</code> になっているか確認<br>' +
+        '⑤ <b>このページを F5 で再読み込み</b><br>' +
+        '<span class="hl2">※古い版が別に残っている場合は無効にしてください（二重に動きます）</span>' +
+        '</details>' +
+        '<details><summary>まだ入れていない場合</summary>' +
         '① Chromeに <code>Tampermonkey</code> を入れる（Chromeウェブストア）<br>' +
         '② Tampermonkeyアイコン →「新規スクリプトを作成」→ 中身を全消し →' +
         ' <code>reality-bridge.user.js</code> を貼り付け → <code>Ctrl+S</code><br>' +
-        '③ スクリプト一覧で「有効」になっているか確認<br>' +
-        '④ <b>このページを F5 で再読み込み</b><br>' +
-        '<span class="hl2">※入れ替えた場合、古いスクリプトは無効にしてください</span>' +
+        '③ スクリプト一覧で「有効」になっているか確認 → このページを F5' +
         '</details>';
     }
     applyMode();

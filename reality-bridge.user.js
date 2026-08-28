@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         夏祭り順番待ち — REALITYコメント橋渡し
 // @namespace    https://penguin-penpen-313.github.io/Queue-app-Summer/
-// @version      1.4.0
+// @version      1.4.1
 // @description  REALITYのコメント画面で受信したコメントを、順番待ちアプリへ転送します（診断つき）
 // @author       -
 // @match        https://reality.app/*
 // @match        https://*.reality.app/*
-// @match        https://penguin-penpen-313.github.io/Queue-app-Summer/test.html*
+// @match        https://penguin-penpen-313.github.io/Queue-app-Summer/*
+// @match        https://*.github.io/*/test.html*
+// @match        https://*.netlify.app/*
+// @match        https://*.pages.dev/*
 // @match        http://localhost/*
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1/*
@@ -18,7 +21,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
 
   /* =============================================================
    *  設定：順番待ちアプリのURL（GitHub Pages）
@@ -41,6 +44,18 @@
   try { QUEUE_ORIGIN = new URL(QUEUE_URL).origin; }
   catch (_) { QUEUE_URL = DEFAULT_QUEUE_URL; QUEUE_ORIGIN = new URL(QUEUE_URL).origin; }
   const SAME_SITE = (location.origin === QUEUE_ORIGIN);   // アプリ自身のページ（動作確認ページ）
+
+  /* アプリ自身のサイトでは「テストページ」だけで動かす。
+     順番待ち画面(index.html)は配信に映る可能性があるのでパネルを出さない。
+     ページ名を変えた場合は URL に ?bridge=1 を付ければ動く。 */
+  if (SAME_SITE) {
+    const onTestPage = /(^|\/)test\.html$/i.test(location.pathname)
+                    || /[?&]bridge=1\b/.test(location.search);
+    if (!onTestPage) {
+      console.log('[matsuri] 橋渡しスクリプト v' + VERSION + ' — このページでは待機します（テストページ以外）');
+      return;
+    }
+  }
   const saveSettings = () => { try { localStorage.setItem(LS, JSON.stringify(settings)); } catch (_) {} };
 
   const stats = { ws: 0, es: 0, xhr: 0, fetch: 0, worker: 0, recv: 0, sent: 0, queued: 0, lastRaw: '' };
