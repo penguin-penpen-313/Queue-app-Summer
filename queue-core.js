@@ -121,10 +121,13 @@
     const coins = parseInt(String(m[1]).replace(/,/g, ''), 10);
     const count = m[2] ? parseInt(m[2], 10) : 1;
     if (!isFinite(coins) || coins <= 0 || !isFinite(count) || count <= 0) return null;
-    const raw = coins * count;
+    // 何コインで1発か（config.gift.coinsPerShell）。既定 10C = 1発
+    const per = Math.max(1, CFG.gift.coinsPerShell || 1);
+    const totalCoins = coins * count;
+    const raw = Math.round(totalCoins / per);
     const shells = Math.max(CFG.gift.minShells || 1,
-                   Math.min(CFG.gift.maxShells || 10000, raw));
-    return { coins, count, rawShells: raw, shells };
+                   Math.min(CFG.gift.maxShells || 1000, raw));
+    return { coins, count, totalCoins, coinsPerShell: per, rawShells: raw, shells };
   }
 
   /* ---- ギフト文から「贈り主」と「ギフト名」を切り出す ----

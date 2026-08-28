@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         夏祭り順番待ち — REALITYコメント橋渡し
 // @namespace    https://penguin-penpen-313.github.io/Queue-app-Summer/
-// @version      1.4.1
+// @version      1.4.2
 // @description  REALITYのコメント画面で受信したコメントを、順番待ちアプリへ転送します（診断つき）
 // @author       -
 // @match        https://reality.app/*
@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
 
   /* =============================================================
    *  設定：順番待ちアプリのURL（GitHub Pages）

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260827a">
+<link rel="stylesheet" href="theme.css?v=20260828a">
 <style>
   /* ===== 上部：導入判定バー ===== */
   .verdict {
@@ -231,6 +231,9 @@
     </div>
 
     <div class="blabel">ギフト（花火）</div>
+    <div class="segnote" style="margin:0 0 8px">
+      <span id="fwRule"></span>　大きいギフトは「特大」「ペンギン柄」のスペシャル花火が混ざります。
+    </div>
     <input type="text" id="giftName" placeholder="ギフト名" value="小さなアヒルさん" maxlength="30">
     <div class="row2" style="margin-bottom:6px">
       <div>
@@ -242,7 +245,7 @@
         <input type="number" id="giftCount" value="8" min="1" max="10000" step="1">
       </div>
     </div>
-    <div class="giftinfo" id="giftInfo">→ 花火 800発</div>
+    <div class="giftinfo" id="giftInfo">→ 花火 80発</div>
     <div class="chips" id="giftChips"></div>
     <button class="btn gift" id="btnGift">ギフトを投げる</button>
 
@@ -250,7 +253,7 @@
     <div class="ebadge" id="engineBadge">…</div>
 
     <div class="blabel">リンク・操作</div>
-    <a class="hlink" href="index.html?v=20260827a" target="_blank">順番待ち画面 ↗</a>
+    <a class="hlink" href="index.html?v=20260828a" target="_blank">順番待ち画面 ↗</a>
     <a class="hlink" href="#" id="adminLink" target="_blank">管理パネル ↗</a>
     <button class="btn d sm" id="btnReset">順番待ちを全部消す</button>
 
@@ -292,10 +295,10 @@
 
 </div>
 
-<script src="config.js?v=20260827a"></script>
-<script src="theme.js?v=20260827a"></script>
-<script src="queue-core.js?v=20260827a"></script>
-<script type="module" src="firebase-sync.js?v=20260827a"></script>
+<script src="config.js?v=20260828a"></script>
+<script src="theme.js?v=20260828a"></script>
+<script src="queue-core.js?v=20260828a"></script>
+<script type="module" src="firebase-sync.js?v=20260828a"></script>
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
@@ -314,7 +317,7 @@
   Engine.start(5);
 
   /* ================= 1. 橋渡しの導入判定 ================= */
-  const EXPECTED_BRIDGE = '1.4.1';   // 同梱の reality-bridge.user.js の版
+  const EXPECTED_BRIDGE = '1.4.2';   // 同梱の reality-bridge.user.js の版
   let bridgeSeen = false;
 
   function checkInstall() {
@@ -508,12 +511,19 @@
   function updateGiftInfo() {
     const coins = Math.max(1, parseInt(gCoin.value, 10) || 1);
     const count = Math.max(1, parseInt(gCount.value, 10) || 1);
-    const raw = coins * count, cap = CFG.gift.maxShells || 10000;
-    gInfo.textContent = '→ 花火 ' + Math.min(raw, cap).toLocaleString() + '発'
-      + (raw > cap ? `（${raw.toLocaleString()}発 → 上限${cap.toLocaleString()}発）` : '');
+    const per   = Math.max(1, CFG.gift.coinsPerShell || 1);
+    const cap   = CFG.gift.maxShells || 1000;
+    const total = coins * count;
+    const raw   = Math.round(total / per);
+    const n     = Math.max(1, Math.min(raw, cap));
+    gInfo.textContent = total.toLocaleString() + 'C ÷ ' + per + ' → 花火 ' + n.toLocaleString() + '発'
+      + (raw > cap ? `（上限${cap.toLocaleString()}発）` : '');
   }
   [gCoin, gCount].forEach(el => el.addEventListener('input', updateGiftInfo));
   updateGiftInfo();
+  document.getElementById('fwRule').textContent =
+    (CFG.gift.coinsPerShell || 1) + 'Cで1発／上限 ' + (CFG.gift.maxShells || 1000).toLocaleString() +
+    '発（最長 ' + ((CFG.fireworks.maxDurationMs || 10000) / 1000) + '秒）。';
 
   document.getElementById('btnGift').onclick = () => {
     const n = nameOrAlert(); if (!n) return;
@@ -523,7 +533,7 @@
   };
 
   const gChips = document.getElementById('giftChips');
-  [[10,1],[100,8],[1000,3],[500,20],[10000,1]].forEach(([c,k]) => {
+  [[10,1],[100,8],[1000,3],[5000,1],[10000,1]].forEach(([c,k]) => {
     const b = document.createElement('button');
     b.className = 'chip';
     b.textContent = `${c.toLocaleString()}C${k > 1 ? '×' + k : ''}`;

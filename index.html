@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260827a">
+<link rel="stylesheet" href="theme.css?v=20260828a">
 <style>
   .page {
     max-width: 720px;
@@ -367,10 +367,10 @@
 
 </div>
 
-<script src="config.js?v=20260827a"></script>
-<script src="theme.js?v=20260827a"></script>
-<script src="queue-core.js?v=20260827a"></script>
-<script type="module" src="firebase-sync.js?v=20260827a"></script>
+<script src="config.js?v=20260828a"></script>
+<script src="theme.js?v=20260828a"></script>
+<script src="queue-core.js?v=20260828a"></script>
+<script type="module" src="firebase-sync.js?v=20260828a"></script>
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
@@ -403,7 +403,8 @@
   }
 
   /* --- 花火（ギフト連動） --- */
-  const fw = window.Fireworks(document.getElementById('fireworks'));
+  const fw = window.Fireworks(document.getElementById("fireworks"));
+  window.__fwProbe = fw;   // 動作確認用（画面には影響しません）
 
   /* --- 同期状態の表示 --- */
   const syncPill = document.getElementById('syncPill');
