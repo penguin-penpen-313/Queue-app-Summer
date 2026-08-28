@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         夏祭り順番待ち — REALITYコメント橋渡し
 // @namespace    https://penguin-penpen-313.github.io/Queue-app-Summer/
-// @version      1.2.0
+// @version      1.4.0
 // @description  REALITYのコメント画面で受信したコメントを、順番待ちアプリへ転送します（診断つき）
 // @author       -
 // @match        https://reality.app/*
 // @match        https://*.reality.app/*
-// @match        https://penguin-penpen-313.github.io/Queue-app-Summer/bridge-test.html*
+// @match        https://penguin-penpen-313.github.io/Queue-app-Summer/test.html*
+// @match        http://localhost/*
+// @match        http://localhost:*/*
+// @match        http://127.0.0.1/*
+// @match        http://127.0.0.1:*/*
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -14,22 +18,29 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.4.0';
 
   /* =============================================================
    *  設定：順番待ちアプリのURL（GitHub Pages）
    * ============================================================= */
-  const QUEUE_URL    = 'https://penguin-penpen-313.github.io/Queue-app-Summer/';
-  const QUEUE_ORIGIN = new URL(QUEUE_URL).origin;
-  const SAME_SITE    = (location.origin === QUEUE_ORIGIN);   // アプリ自身のページ（動作確認ページ）
+  const DEFAULT_QUEUE_URL = 'https://penguin-penpen-313.github.io/Queue-app-Summer/';
   const LS = 'matsuri-bridge-settings';
 
   console.log('[matsuri] 橋渡しスクリプト v' + VERSION + ' 起動 @ ' + location.href);
 
   const settings = Object.assign(
-    { domSelector: '', domMode: false, hidden: false, openTab: 'main' },
+    { domSelector: '', domMode: false, hidden: false, openTab: 'main', queueUrl: '',
+      pos: null, autoCollapse: true },
     (() => { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch (_) { return {}; } })()
   );
+
+  /* 順番待ちアプリのURL。GitHubが落ちている等で別の場所に置いた場合は
+     パネルの「接続」タブから変更できる（コードを書き換えなくてよい）。 */
+  let QUEUE_URL = settings.queueUrl || DEFAULT_QUEUE_URL;
+  let QUEUE_ORIGIN;
+  try { QUEUE_ORIGIN = new URL(QUEUE_URL).origin; }
+  catch (_) { QUEUE_URL = DEFAULT_QUEUE_URL; QUEUE_ORIGIN = new URL(QUEUE_URL).origin; }
+  const SAME_SITE = (location.origin === QUEUE_ORIGIN);   // アプリ自身のページ（動作確認ページ）
   const saveSettings = () => { try { localStorage.setItem(LS, JSON.stringify(settings)); } catch (_) {} };
 
   const stats = { ws: 0, es: 0, xhr: 0, fetch: 0, worker: 0, recv: 0, sent: 0, queued: 0, lastRaw: '' };
@@ -187,12 +198,20 @@
     return '';
   }
 
-  let seenComment = new Set();
+  /* 同じコメントが WS と fetch など複数の経路で二重に届くことがある。
+     一定時間だけ覚えて弾く（ずっと覚えていると、同じ人が同じギフトを
+     もう一度投げたときに無視されてしまうため）。 */
+  const seenComment = new Map();
+  const DEDUPE_MS = 8000;
   function sendComment(c) {
     const key = c.name + '|' + c.content + '|' + (c.ct === undefined ? '' : c.ct);
-    if (seenComment.has(key)) return;
-    seenComment.add(key);
-    if (seenComment.size > 500) seenComment = new Set([...seenComment].slice(-250));
+    const now = Date.now();
+    const prev = seenComment.get(key);
+    if (prev && now - prev < DEDUPE_MS) return;
+    seenComment.set(key, now);
+    if (seenComment.size > 400) {
+      seenComment.forEach((t, k) => { if (now - t > DEDUPE_MS) seenComment.delete(k); });
+    }
 
     const name = typeof c.name === 'string' ? c.name : '';
     const system = !name || !c.uid || c.ct === 8 || c.ct === 9 || c.ct === '8' || c.ct === '9';
@@ -236,7 +255,7 @@
   window.addEventListener('message', (e) => {
     if (e.origin !== QUEUE_ORIGIN) return;
     if (e.data && e.data.__matsuri === 1 && e.data.type === 'ack') {
-      if (!connected) log('順番待ちアプリに接続しました');
+      if (!connected) { log('順番待ちアプリに接続しました'); scheduleAutoCollapse(); }
       connected = true; lastAck = Date.now();
       flushPending(); render();
     }
@@ -391,6 +410,7 @@
     L.push('=== 順番待ち 橋渡し 診断レポート ===');
     L.push('URL: ' + location.href.slice(0, 140));
     L.push('スクリプト: v' + VERSION);
+    L.push('接続先: ' + QUEUE_URL);
     L.push('接続: ' + (connected ? '接続中' : targetWin() ? '応答待ち' : '未接続'));
     L.push('検出数: WS=' + stats.ws + ' SSE=' + stats.es + ' fetch=' + stats.fetch +
            ' XHR=' + stats.xhr + ' Worker=' + stats.worker);
@@ -506,7 +526,25 @@
       wordBreak: 'break-all', maxHeight: '150px', overflow: 'auto' });
     els.log.id = 'mbLog';
     bOpen.id = 'mbOpen'; bTest.id = 'mbTest';
-    els.paneMain.append(bOpen, bTest, els.log);
+    els.qurl = mk('input', { width: '100%', padding: '7px 8px', borderRadius: '6px',
+      border: '1px solid ' + C.line, background: C.bg2, color: C.text,
+      font: '10px ' + MONO, marginBottom: '6px', boxSizing: 'border-box' });
+    els.qurl.id = 'mbQueueUrl';
+    els.qurl.placeholder = '順番待ちアプリのURL';
+    els.qurl.value = QUEUE_URL;
+    const bUrl = btn('この接続先を保存して再読み込み');
+    bUrl.id = 'mbSaveUrl';
+    bUrl.onclick = () => {
+      const v = els.qurl.value.trim();
+      if (!v) return;
+      try { new URL(v); } catch (_) { log('URLの形式が正しくありません'); return; }
+      settings.queueUrl = v; saveSettings();
+      log('接続先を保存しました。再読み込みします');
+      setTimeout(() => location.reload(), 600);
+    };
+    const urlLabel = mk('div', { fontSize: '10px', color: C.muted, margin: '10px 0 4px' },
+      '接続先（別の場所に置いた場合だけ変更）');
+    els.paneMain.append(bOpen, bTest, els.log, urlLabel, els.qurl, bUrl);
     if (SAME_SITE) {
       bOpen.style.display = 'none';
       const n = mk('div', { fontSize: '11px', color: C.cyan, marginBottom: '8px' },
@@ -583,11 +621,22 @@
     document.body.appendChild(panel);
 
     mini = mk('div', { position: 'fixed', right: '12px', bottom: '12px', zIndex: '2147483647',
-      padding: '8px 14px', borderRadius: '999px', background: C.bg, border: '2px solid ' + C.gold,
+      padding: '7px 13px', borderRadius: '999px', background: C.bg, border: '2px solid ' + C.gold,
       color: C.gold, fontSize: '12px', cursor: 'pointer', fontWeight: '700', display: 'none',
-      font: '700 12px ' + FONT }, '▲ 橋渡し');
-    mini.onclick = () => { settings.hidden = false; saveSettings(); render(); };
+      font: '700 12px ' + FONT, userSelect: 'none', whiteSpace: 'nowrap' }, '▲ 橋渡し');
+    mini.id = 'matsuri-bridge-mini';
+    mini.onclick = (e) => {
+      if (mini.dataset.moved === '1') { mini.dataset.moved = '0'; return; }
+      settings.hidden = false; settings.autoCollapse = false; saveSettings(); render();
+    };
     document.body.appendChild(mini);
+
+    /* 位置を復元し、ヘッダー／ピルをドラッグで動かせるようにする
+       （REALITYのコメント欄と重なるときに逃がせるように） */
+    applyPos();
+    makeDraggable(head, panel);
+    makeDraggable(mini, mini);
+    panel.addEventListener('pointerdown', () => { settings.autoCollapse = false; }, true);
 
     // ページ側が中身を作り直してもパネルが消えないよう見張る
     setInterval(() => {
@@ -600,6 +649,70 @@
     }, 2000);
 
     render();
+  }
+
+  /* =============================================================
+   *  パネルの置き場所（ドラッグ移動・自動たたみ）
+   * ============================================================= */
+  function applyPos() {
+    const p = settings.pos;
+    if (!p) return;
+    [panel, mini].forEach(el => {
+      if (!el) return;
+      el.style.left = 'auto'; el.style.top = 'auto';
+      el.style.right  = Math.max(4, p.right)  + 'px';
+      el.style.bottom = Math.max(4, p.bottom) + 'px';
+    });
+  }
+
+  function makeDraggable(handle, target) {
+    if (!handle || !target) return;
+    handle.style.touchAction = 'none';
+    if (handle === target) handle.style.cursor = 'grab';
+    else handle.style.cursor = 'move';
+    let sx = 0, sy = 0, sr = 0, sb = 0, dragging = false;
+
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.target && e.target.tagName === 'BUTTON' && e.target !== handle) return;
+      dragging = true;
+      sx = e.clientX; sy = e.clientY;
+      const r = target.getBoundingClientRect();
+      sr = innerWidth  - r.right;
+      sb = innerHeight - r.bottom;
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 4) target.dataset.moved = '1';
+      settings.pos = {
+        right:  Math.max(4, Math.min(innerWidth  - 60, sr - dx)),
+        bottom: Math.max(4, Math.min(innerHeight - 40, sb - dy))
+      };
+      applyPos();
+    });
+    const end = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      saveSettings();
+      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+      setTimeout(() => { if (target.dataset) target.dataset.moved = '0'; }, 250);
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  }
+
+  /* 接続できたら数秒後に自動でピルへ折りたたむ。
+     動作確認ページ（アプリ自身）と、ユーザーが自分で開いた場合は折りたたまない。 */
+  let collapseTimer = null;
+  function scheduleAutoCollapse() {
+    if (SAME_SITE || !settings.autoCollapse || settings.hidden) return;
+    clearTimeout(collapseTimer);
+    collapseTimer = setTimeout(() => {
+      if (!settings.autoCollapse || !connected) return;
+      settings.hidden = true; saveSettings(); render();
+      console.log('[matsuri] 接続できたのでパネルをたたみました（ピルをクリックで戻せます）');
+    }, 8000);
   }
 
   function refreshReport() { if (els.report) els.report.textContent = report(); }
@@ -616,6 +729,11 @@
     mini.style.display = settings.hidden ? '' : 'none';
     els.dot.style.background = connected ? C.cyan : '#666';
     els.dot.style.boxShadow = connected ? '0 0 9px ' + C.cyan : 'none';
+
+    // たたんだ状態でも「繋がっているか・流れているか」が分かるようにする
+    mini.textContent = (connected ? '● ' : '○ ') + '橋渡し ' + stats.sent;
+    mini.style.borderColor = connected ? C.cyan : C.gold;
+    mini.style.color       = connected ? C.cyan : C.gold;
 
     Object.keys(els.tabs).forEach(k => {
       const on = (k === settings.openTab);

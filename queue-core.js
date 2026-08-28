@@ -56,13 +56,27 @@
   /* ============ コメント解析 ============ */
 
   function buildSystemRe(template) {
-    const parts = template.split('{name}');
+    const parts = String(template).split('{name}');
     const re = parts.map(escapeRe).join('(.+?)');
     return new RegExp(CFG.systemMessage.matchWholeLine ? '^' + re + '$' : re);
   }
 
-  const RE_JOIN_SYS  = buildSystemRe(CFG.systemMessage.collabJoin);
-  const RE_LEAVE_SYS = buildSystemRe(CFG.systemMessage.collabLeave);
+  const asList = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
+
+  // 参加／退出の文言は複数パターンを許容する（「を退出」「から退出」など）
+  const RE_JOIN_SYS  = asList(CFG.systemMessage.collabJoin).map(buildSystemRe);
+  const RE_LEAVE_SYS = asList(CFG.systemMessage.collabLeave).map(buildSystemRe);
+
+  function matchAny(reList, line) {
+    for (let i = 0; i < reList.length; i++) {
+      const m = line.match(reList[i]);
+      if (m) return m;
+    }
+    return null;
+  }
+  function includesAny(list, text) {
+    return asList(list).some(s => s && text.indexOf(s) >= 0);
+  }
 
   function isJoinKeyword(body) {
     const b = keyOf(body);
@@ -85,10 +99,10 @@
     if (!n) return c;                       // 名前なし＝システム文がそのまま入っている
     if (isSystem) {
       const SM = CFG.systemMessage;
-      if (SM.collabLeaveBody && c.indexOf(SM.collabLeaveBody) >= 0)
-        return SM.collabLeave.replace('{name}', n);
-      if (SM.collabJoinBody && c.indexOf(SM.collabJoinBody) >= 0)
-        return SM.collabJoin.replace('{name}', n);
+      if (includesAny(SM.collabLeaveBody, c))
+        return asList(SM.collabLeave)[0].replace('{name}', n);
+      if (includesAny(SM.collabJoinBody, c))
+        return asList(SM.collabJoin)[0].replace('{name}', n);
     }
     return n + '\n' + c;
   }
@@ -113,20 +127,53 @@
     return { coins, count, rawShells: raw, shells };
   }
 
+  /* ---- ギフト文から「贈り主」と「ギフト名」を切り出す ----
+   * REALITY のギフト行は名前欄が空で、本文が
+   *   「<贈り主> <ギフト名>(1000C)×3をあげました」
+   * の1行だけで届く。ギフト名は (1000C) の直前の1語なので、
+   * 「(数字C)」の手前を最後の空白で割れば贈り主が取れる。
+   *   お中元 名前入りキャンプタワー(10000C)をあげました
+   *     → 贈り主「お中元」／ギフト名「名前入りキャンプタワー」
+   *   ｴﾘｵｯﾄ&ｴﾝｼﾞｪﾙちゃん🪽👼⭐️ 小さなアヒルさん(100C)×8をあげました
+   *     → 贈り主「ｴﾘｵｯﾄ&ｴﾝｼﾞｪﾙちゃん🪽👼⭐️」／ギフト名「小さなアヒルさん」
+   */
+  function splitGiftLine(text) {
+    const t = normalize(text);
+    const i = t.search(/[(（]\s*\d[\d,]*\s*[CcＣ]/);
+    if (i <= 0) return { giver: '', item: '' };
+    const head = t.slice(0, i).replace(/[\s　]+$/, '');
+    const m = head.match(/^(.*?)[\s　]([^\s　]+)$/);
+    if (m) return { giver: m[1].trim(), item: m[2] };
+    return { giver: '', item: head };   // 空白が無い＝ギフト名だけ
+  }
+
   function interpret(rawText) {
     const lines = String(rawText || '').replace(/\r/g, '').split('\n');
     const firstLine = (lines[0] || '').trim();
     const body = lines.slice(1).join('\n').trim();
 
-    const mLeave = firstLine.match(RE_LEAVE_SYS);
+    const mLeave = matchAny(RE_LEAVE_SYS, firstLine);
     if (mLeave) return { type: 'collab-leave', name: cleanName(mLeave[1]), body: firstLine };
 
-    const mJoin = firstLine.match(RE_JOIN_SYS);
+    const mJoin = matchAny(RE_JOIN_SYS, firstLine);
     if (mJoin) return { type: 'collab-join', name: cleanName(mJoin[1]), body: firstLine };
 
-    // ギフトは1行目・本文のどちらに入っていても拾う
-    const gift = parseGift(body) || parseGift(firstLine);
-    if (gift) return { type: 'gift', name: cleanName(firstLine), body: body || firstLine, gift };
+    /* ---- ギフト ----
+     * 通常は「1行目＝ユーザー名 / 2行目＝<名前> <ギフト名>(1000C)×3をあげました」。
+     * 1行しか無い場合、その行はギフト文そのものなので
+     * 名前として採用してはいけない（文章まるごとが名前になってしまう）。 */
+    const giftInBody = parseGift(body);
+    if (giftInBody) {
+      const sp = splitGiftLine(body);
+      return { type: 'gift', name: cleanName(firstLine) || cleanName(sp.giver),
+               giftName: sp.item, body: body, gift: giftInBody };
+    }
+    const giftInLine1 = parseGift(firstLine);
+    if (giftInLine1) {
+      const sp = splitGiftLine(firstLine);
+      return { type: 'gift', name: cleanName(sp.giver),
+               giftName: sp.item, body: firstLine, gift: giftInLine1 };
+    }
 
     if (isJoinKeyword(body)) return { type: 'join', name: cleanName(firstLine), body };
 
@@ -336,10 +383,29 @@
       return { ok: false, reason: 'not-found' };
     },
 
-    /* ---- ギフト＝花火の打ち上げ指示（全端末に伝わる） ---- */
+    /* ---- ギフト＝花火の打ち上げ指示（全端末に伝わる） ----
+     * 同じギフトが複数の経路（WebSocket＋DOM監視など）から届いても
+     * 二重に数えないよう、短時間の同一ギフトは弾く。 */
+    _giftSeen: {},
     gift(g, fromName) {
       this._fresh();
       const shells = Math.max(1, Math.round(g && g.shells ? g.shells : g));
+
+      const win = (CFG.gift && CFG.gift.dedupeMs) || 0;
+      if (win > 0) {
+        const sig = keyOf(fromName || '') + '|' + shells + '|' +
+                    ((g && g.coins) || 0) + 'x' + ((g && g.count) || 1);
+        const now = Date.now();
+        // 古い記録を掃除
+        Object.keys(this._giftSeen).forEach(k => {
+          if (now - this._giftSeen[k] > win) delete this._giftSeen[k];
+        });
+        if (this._giftSeen[sig] && now - this._giftSeen[sig] < win) {
+          return { ok: false, reason: 'duplicate', shells };
+        }
+        this._giftSeen[sig] = now;
+      }
+
       this.state.fx = {
         id: uid(),
         kind: 'gift',
@@ -679,7 +745,7 @@
   /* ============ 公開 ============ */
   global.QueueCore = {
     Store, CommentSource, CommentBus, Engine, Leader,
-    interpret, composeRaw, parseGift, normalize, keyOf, escapeHtml, cleanName, isJoinKeyword, uid,
+    interpret, composeRaw, parseGift, splitGiftLine, normalize, keyOf, escapeHtml, cleanName, isJoinKeyword, uid,
     TAB_ID
   };
 

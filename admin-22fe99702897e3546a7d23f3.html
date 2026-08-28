@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260826a">
+<link rel="stylesheet" href="theme.css?v=20260827a">
 <style>
   body { min-height: 100vh; }
 
@@ -178,6 +178,18 @@
     transition: transform .3s cubic-bezier(.34,1.56,.64,1); z-index: 300;
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .dsum {
+    cursor: pointer; list-style: none;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--muted);
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px;
+    background: rgba(0,0,0,.22);
+  }
+  .dsum::-webkit-details-marker { display: none; }
+  .dsum::before { content: '▸ '; }
+  details[open] .dsum::before { content: '▾ '; }
+  .dsum:hover { color: var(--gold); border-color: rgba(255,210,74,.35); }
 </style>
 </head>
 <body>
@@ -187,9 +199,8 @@
   <div class="head-right">
     <span class="engine" id="engine"><span class="led"></span><span id="engineTxt">停止中</span></span>
     <span class="engine" id="sync"><span class="led"></span><span id="syncTxt">同期—</span></span>
-    <button class="hlink" id="btnReality" style="background:transparent;font-family:inherit;">REALITYコメントを開く ↗</button>
-    <a class="hlink" href="index.html" target="_blank">順番待ち画面 ↗</a>
-    <a class="hlink" href="test-comments.html" target="_blank">テストコメント ↗</a>
+    <a class="hlink" href="index.html?v=20260827a" target="_blank">順番待ち画面 ↗</a>
+    <a class="hlink" href="test.html?v=20260827a" target="_blank">テスト＆動作確認 ↗</a>
   </div>
 </header>
 
@@ -227,30 +238,14 @@
 
     <div class="block">
       <div class="blabel">コメント取得</div>
-      <button class="btn" id="btnEngine">■ エンジン停止</button>
       <div class="hint" style="margin-bottom:6px">
         コメント画面のURL（配信ごとに変わります）
       </div>
       <input type="text" id="realityUrl" placeholder="https://reality.app/comments/..." spellcheck="false">
-      <button class="btn" id="btnReality2">REALITYコメント画面を開く</button>
-      <button class="btn" onclick="window.open('bridge-test.html','_blank')">橋渡しの動作確認 ↗</button>
+      <button class="btn primary" id="btnReality">REALITYコメント画面を開く ↗</button>
       <div class="hint">
-        モード: <code id="modeTxt"></code><br>
-        橋渡し: <code id="bridgeTxt">未接続</code><br>
-        キーワード: <code id="kwTxt"></code>
+        橋渡し: <code id="bridgeTxt">未接続</code>　キーワード: <code id="kwTxt"></code>
       </div>
-    </div>
-
-    <div class="block">
-      <div class="blabel">同期の状態</div>
-      <button class="btn" id="btnSyncTest">🔍 同期をテスト</button>
-      <div class="hint" id="syncInfo"></div>
-    </div>
-
-    <div class="block">
-      <div class="blabel">花火を打ち上げる</div>
-      <input type="text" id="fwShells" placeholder="発数（例: 3000）" value="1000" inputmode="numeric">
-      <button class="btn" id="btnFw">✧ 打ち上げる（全端末）</button>
     </div>
 
     <div class="block">
@@ -258,23 +253,32 @@
       <div class="log" id="log"></div>
     </div>
 
-    <div class="block">
-      <div class="blabel">危険な操作</div>
-      <button class="btn danger" id="btnClear">⚠ 全リセット</button>
-      <div class="hint">
-        ドラッグ／↑↓ で順番変更<br>
-        ▶ でNOWへ、✕ で削除
+    <details class="block">
+      <summary class="dsum">詳細・トラブル対応</summary>
+      <div style="padding-top:12px">
+        <button class="btn" id="btnEngine">■ エンジン停止</button>
+        <button class="btn" id="btnSyncTest">🔍 同期をテスト</button>
+        <div class="hint" id="syncInfo"></div>
+        <div class="hint" style="margin-top:10px">
+          コメント取得モード: <code id="modeTxt"></code>
+        </div>
+        <div style="height:14px"></div>
+        <button class="btn danger" id="btnClear">⚠ 全リセット</button>
       </div>
+    </details>
+
+    <div class="hint" style="margin-top:14px">
+      ドラッグ／↑↓ で順番変更　▶ でNOWへ　✕ で削除
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20260826a"></script>
-<script src="theme.js?v=20260826a"></script>
-<script src="queue-core.js?v=20260826a"></script>
-<script type="module" src="firebase-sync.js?v=20260826a"></script>
+<script src="config.js?v=20260827a"></script>
+<script src="theme.js?v=20260827a"></script>
+<script src="queue-core.js?v=20260827a"></script>
+<script type="module" src="firebase-sync.js?v=20260827a"></script>
 <script>
 (function () {
   const CFG = window.APP_CONFIG;
@@ -303,7 +307,6 @@
     if (!realityWin) toast('ポップアップがブロックされました。許可してください');
   }
   document.getElementById('btnReality').onclick = openReality;
-  document.getElementById('btnReality2').onclick = openReality;
 
   document.title = CFG.labels.adminTitle + ' | ' + CFG.app.title;
   document.getElementById('brandT').textContent = CFG.labels.adminTitle;
@@ -427,14 +430,6 @@
   document.getElementById('addName').addEventListener('keydown', e => {
     if (e.key === 'Enter') addFrom(false);
   });
-
-  document.getElementById('btnFw').onclick = () => {
-    const n = Math.max(1, parseInt(document.getElementById('fwShells').value, 10) || 1);
-    const cap = (CFG.gift && CFG.gift.maxShells) || 10000;
-    const shells = Math.min(n, cap);
-    Store.gift({ shells, coins: shells, count: 1 }, '');
-    toast(`花火 ${shells.toLocaleString()}発 を打ち上げ`);
-  };
 
   document.getElementById('btnClear').onclick = () => {
     if (confirm('順番待ち・出演中・ログをすべて消去します。よろしいですか？')) {
